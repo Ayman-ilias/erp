@@ -1,0 +1,2117 @@
+\documentclass[12pt,a4paper]{book}
+
+% ============ PACKAGES ============
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{fancyvrb}
+\usepackage{mdframed}
+
+% ============ COLORS ============
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{codeblue}{rgb}{0.13,0.29,0.53}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.95}
+\definecolor{keywordcolor}{rgb}{0.0,0.0,0.7}
+\definecolor{stringcolor}{rgb}{0.0,0.5,0.0}
+\definecolor{commentcolor}{rgb}{0.5,0.5,0.5}
+\definecolor{tipbg}{rgb}{0.9,0.97,0.9}
+\definecolor{warnbg}{rgb}{1.0,0.95,0.9}
+\definecolor{notebg}{rgb}{0.9,0.95,1.0}
+
+% ============ CODE LISTINGS ============
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{commentcolor}\itshape,
+    keywordstyle=\color{keywordcolor}\bfseries,
+    stringstyle=\color{stringcolor},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=8pt,
+    numberstyle=\tiny\color{codegray},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{codegray},
+    language=Python,
+    morekeywords={async, await, yield, None, True, False, self, cls},
+}
+
+\lstset{style=pythonstyle}
+
+% ============ CUSTOM BOXES ============
+\newtcolorbox{tipbox}{
+    colback=tipbg,
+    colframe=green!60!black,
+    title=Tip,
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{warningbox}{
+    colback=warnbg,
+    colframe=orange!80!black,
+    title=Warning,
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{notebox}{
+    colback=notebg,
+    colframe=blue!60!black,
+    title=Note,
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{exercisebox}{
+    colback=gray!10,
+    colframe=gray!60!black,
+    title=Exercise,
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{conceptbox}[1]{
+    colback=white,
+    colframe=codeblue,
+    title=#1,
+    fonttitle=\bfseries
+}
+
+% ============ HEADER/FOOTER ============
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[LO]{\leftmark}
+\fancyhead[RE]{\rightmark}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============ TITLE FORMATTING ============
+\titleformat{\chapter}[display]
+    {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{40pt}
+
+% ============ HYPERREF SETUP ============
+\hypersetup{
+    colorlinks=true,
+    linkcolor=codeblue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={RMG ERP Backend - Complete Developer Guide},
+    pdfauthor={Southern Apparels},
+}
+
+% ============ DOCUMENT INFO ============
+\title{
+    \Huge\textbf{RMG ERP Backend} \\
+    \vspace{0.5cm}
+    \LARGE Complete Developer Guide \\
+    \vspace{1cm}
+    \large Understanding Your Codebase from Zero to Confident
+}
+\author{Southern Apparels Development Team}
+\date{\today}
+
+% ============ BEGIN DOCUMENT ============
+\begin{document}
+
+% ============ TITLE PAGE ============
+\maketitle
+
+% ============ TABLE OF CONTENTS ============
+\tableofcontents
+\newpage
+
+% ============ PREFACE ============
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+This book is written specifically for you --- the developer who built this ERP system but wants to truly understand every piece of it. By the end of this book, you will:
+
+\begin{itemize}
+    \item Understand what every file and folder does
+    \item Know how a web request flows through your system
+    \item Understand databases, models, and relationships
+    \item Be able to debug issues without help
+    \item Feel confident making changes to any part of the codebase
+\end{itemize}
+
+\begin{notebox}
+This is not a generic Python or FastAPI tutorial. Every example in this book comes from YOUR actual codebase. You can open the files mentioned and see the exact code described.
+\end{notebox}
+
+\textbf{How to use this book:}
+\begin{enumerate}
+    \item Read each chapter completely
+    \item Do the exercises at the end of each chapter
+    \item Have your code editor open alongside this book
+    \item Don't skip chapters --- each builds on the previous
+\end{enumerate}
+
+\vspace{1cm}
+\textit{Let's begin your journey to mastering your own codebase.}
+
+% ============ PART I: FOUNDATIONS ============
+\part{Foundations}
+
+% ============ CHAPTER 1: THE BIG PICTURE ============
+\chapter{The Big Picture}
+
+\section{What Is This Project?}
+
+You built an \textbf{ERP system} (Enterprise Resource Planning) for a \textbf{garments company}. RMG stands for ``Ready Made Garments'' --- the clothing manufacturing industry.
+
+Think of your ERP system as a \textbf{digital brain} for a clothing factory. It tracks:
+
+\begin{itemize}
+    \item \textbf{WHO} you sell to (Buyers like H\&M, Zara, Primark)
+    \item \textbf{WHO} supplies materials (Yarn suppliers, fabric suppliers)
+    \item \textbf{WHAT} you make (Styles, samples, products)
+    \item \textbf{HOW MUCH} you make (Orders, quantities, prices)
+    \item \textbf{WHO} works here (Users, their permissions)
+\end{itemize}
+
+\section{Frontend vs Backend}
+
+Your project is the \textbf{backend} --- the invisible engine that powers everything.
+
+\begin{center}
+\begin{tikzpicture}[
+    box/.style={rectangle, draw, minimum width=3cm, minimum height=1.5cm, align=center},
+    arrow/.style={->, thick}
+]
+    \node[box] (frontend) at (0,0) {FRONTEND\\(Website)};
+    \node[box] (backend) at (5,0) {BACKEND\\(Your Code)};
+    \node[box] (database) at (10,0) {DATABASE\\(Storage)};
+
+    \draw[arrow] (frontend.east) -- node[above] {Request} (backend.west);
+    \draw[arrow] (backend.east) -- node[above] {Query} (database.west);
+    \draw[arrow] (database.west) -- node[below] {Data} (backend.east);
+    \draw[arrow] (backend.west) -- node[below] {Response} (frontend.east);
+\end{tikzpicture}
+\end{center}
+
+\textbf{Example flow:}
+\begin{enumerate}
+    \item User clicks ``Show all buyers'' on the website
+    \item Frontend sends a request to your backend
+    \item Your backend asks the database for all buyers
+    \item Database returns the list of buyers
+    \item Your backend sends it back to the frontend
+    \item User sees the list on their screen
+\end{enumerate}
+
+\section{Project Structure Overview}
+
+Your project is organized like a well-planned building:
+
+\begin{verbatim}
+erp-backend/
+|
+|-- main.py              <- THE STARTING POINT (front door)
+|
+|-- core/                <- SHARED TOOLS (utilities room)
+|   |-- config.py        <- Settings (database URLs, secrets)
+|   |-- database.py      <- Database connections
+|   |-- security.py      <- Password hashing, tokens
+|   |-- logging.py       <- Error logging
+|   +-- cache.py         <- Redis caching
+|
+|-- modules/             <- THE FEATURES (rooms in the building)
+|   |-- auth/            <- Login/logout
+|   |-- clients/         <- Buyers & suppliers
+|   |-- samples/         <- Sample tracking
+|   |-- orders/          <- Order management
+|   |-- materials/       <- Material master data
+|   |-- users/           <- User management
+|   |-- operations/      <- Operations & SMV
+|   |-- master_data/     <- Colors & sizes
+|   |-- merchandiser/    <- Future features
+|   +-- health/          <- System health checks
+|
+|-- .env                 <- SECRETS (never share!)
+|-- docker-compose.yml   <- How to run with Docker
+|-- requirements.txt     <- Python libraries needed
++-- openapi.yaml         <- API documentation
+\end{verbatim}
+
+\begin{conceptbox}{Key Concept: Separation of Concerns}
+Each folder has ONE job:
+\begin{itemize}
+    \item \texttt{core/} = Tools everyone uses
+    \item \texttt{modules/auth/} = Only login/logout
+    \item \texttt{modules/clients/} = Only buyer/supplier stuff
+\end{itemize}
+This makes code easier to find and maintain.
+\end{conceptbox}
+
+\section{Inside Each Module}
+
+Every module folder has the same structure:
+
+\begin{verbatim}
+modules/clients/
+|-- __init__.py          <- Makes it a Python package
+|-- models/
+|   +-- client.py        <- Database table definitions
+|-- routes/
+|   |-- buyers.py        <- API endpoints for buyers
+|   |-- suppliers.py     <- API endpoints for suppliers
+|   +-- contacts.py      <- API endpoints for contacts
++-- schemas/
+    |-- buyer.py         <- Data validation rules
+    +-- supplier.py      <- Data validation rules
+\end{verbatim}
+
+\begin{itemize}
+    \item \textbf{models/} = What the database tables look like
+    \item \textbf{routes/} = What URLs/endpoints are available
+    \item \textbf{schemas/} = What data format is expected/returned
+\end{itemize}
+
+\section{The Starting Point: main.py}
+
+Everything begins in \texttt{main.py}. Here's what it does:
+
+\begin{lstlisting}[caption={main.py - The Entry Point (simplified)}]
+from fastapi import FastAPI
+from core import settings, init_db
+
+# Create the web application
+app = FastAPI(title="RMG ERP System")
+
+# When server starts, connect to databases
+@app.on_event("startup")
+async def startup_event():
+    init_db()  # Connect to all 5 databases
+
+# Register all the feature modules
+from modules.auth import auth_router
+from modules.clients import buyers_router
+
+app.include_router(auth_router, prefix="/api/v1/auth")
+app.include_router(buyers_router, prefix="/api/v1/buyers")
+# ... more routers
+\end{lstlisting}
+
+\begin{conceptbox}{Key Concept: Routers}
+A \textbf{router} directs requests to the right code:
+\begin{itemize}
+    \item Request to \texttt{/api/v1/auth/login} $\rightarrow$ goes to \texttt{auth\_router}
+    \item Request to \texttt{/api/v1/buyers/} $\rightarrow$ goes to \texttt{buyers\_router}
+\end{itemize}
+It's like a phone menu: ``Press 1 for Sales, Press 2 for Support''
+\end{conceptbox}
+
+\section{Chapter Summary}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Concept} & \textbf{Meaning} \\
+\midrule
+Backend & The invisible server that processes requests \\
+main.py & The starting point that creates the app \\
+modules/ & Each feature in its own folder \\
+Router & Directs requests to the right code \\
+core/ & Shared tools (database, security, settings) \\
+\bottomrule
+\end{tabular}
+
+\begin{exercisebox}
+\begin{enumerate}
+    \item Open \texttt{main.py} in your editor. Count how many routers are registered.
+    \item Find which router handles \texttt{/api/v1/materials/}
+    \item List all the folders inside \texttt{modules/}
+\end{enumerate}
+\end{exercisebox}
+
+
+% ============ CHAPTER 2: HOW REQUESTS WORK ============
+\chapter{How Web Requests Work}
+
+\section{What Is an API?}
+
+API stands for \textbf{Application Programming Interface}. It's a way for programs to talk to each other.
+
+Your backend provides a \textbf{REST API} --- a set of URLs that accept requests and return data.
+
+\begin{verbatim}
+GET  /api/v1/buyers/      -> Get list of all buyers
+POST /api/v1/buyers/      -> Create a new buyer
+GET  /api/v1/buyers/5     -> Get buyer with ID 5
+PUT  /api/v1/buyers/5     -> Update buyer with ID 5
+DELETE /api/v1/buyers/5   -> Delete buyer with ID 5
+\end{verbatim}
+
+\section{HTTP Methods}
+
+\begin{tabular}{lll}
+\toprule
+\textbf{Method} & \textbf{Purpose} & \textbf{Example} \\
+\midrule
+GET & Read/retrieve data & Get all buyers \\
+POST & Create new data & Create a new buyer \\
+PUT & Update existing data & Update buyer info \\
+DELETE & Remove data & Delete a buyer \\
+\bottomrule
+\end{tabular}
+
+\begin{notebox}
+Think of it like this:
+\begin{itemize}
+    \item GET = ``Show me''
+    \item POST = ``Create this''
+    \item PUT = ``Change this''
+    \item DELETE = ``Remove this''
+\end{itemize}
+\end{notebox}
+
+\section{Anatomy of a Request}
+
+Every HTTP request has:
+
+\begin{enumerate}
+    \item \textbf{URL} --- Where to send it (\texttt{/api/v1/buyers/})
+    \item \textbf{Method} --- What action (GET, POST, etc.)
+    \item \textbf{Headers} --- Metadata (authentication token, content type)
+    \item \textbf{Body} --- Data to send (for POST/PUT requests)
+\end{enumerate}
+
+\textbf{Example: Creating a buyer}
+\begin{verbatim}
+POST /api/v1/buyers/
+Headers:
+    Content-Type: application/json
+    Authorization: Bearer eyJhbGc...
+
+Body:
+{
+    "buyer_name": "H&M",
+    "company_name": "H&M Hennes & Mauritz AB",
+    "email": "sourcing@hm.com"
+}
+\end{verbatim}
+
+\section{Anatomy of a Response}
+
+Every HTTP response has:
+
+\begin{enumerate}
+    \item \textbf{Status Code} --- Was it successful?
+    \item \textbf{Headers} --- Metadata about the response
+    \item \textbf{Body} --- The actual data returned
+\end{enumerate}
+
+\textbf{Common Status Codes:}
+\begin{tabular}{lll}
+\toprule
+\textbf{Code} & \textbf{Meaning} & \textbf{When Used} \\
+\midrule
+200 & OK & Successful GET or PUT \\
+201 & Created & Successful POST (new resource created) \\
+204 & No Content & Successful DELETE \\
+400 & Bad Request & Invalid data sent \\
+401 & Unauthorized & Not logged in or invalid token \\
+404 & Not Found & Resource doesn't exist \\
+422 & Validation Error & Data failed validation \\
+500 & Server Error & Something broke on the server \\
+\bottomrule
+\end{tabular}
+
+\section{FastAPI Route Definitions}
+
+In FastAPI, you define routes using \textbf{decorators}. Here's a real example from your code:
+
+\begin{lstlisting}[caption={buyers.py - Route Definitions}]
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from core.database import get_db_clients
+from modules.clients.models.client import Buyer
+from modules.clients.schemas.buyer import BuyerCreate, BuyerResponse
+
+router = APIRouter()
+
+@router.get("/", response_model=List[BuyerResponse])
+def get_buyers(db: Session = Depends(get_db_clients)):
+    """Get all buyers"""
+    buyers = db.query(Buyer).order_by(Buyer.id.desc()).all()
+    return buyers
+
+@router.post("/", response_model=BuyerResponse,
+             status_code=status.HTTP_201_CREATED)
+def create_buyer(buyer_data: BuyerCreate,
+                 db: Session = Depends(get_db_clients)):
+    """Create a new buyer"""
+    new_buyer = Buyer(**buyer_data.model_dump())
+    db.add(new_buyer)
+    db.commit()
+    db.refresh(new_buyer)
+    return new_buyer
+\end{lstlisting}
+
+Let's break this down line by line:
+
+\subsection{Line: @router.get("/")}
+\begin{itemize}
+    \item \texttt{@router} = This is a decorator, attaches to the function below
+    \item \texttt{.get} = This handles GET requests
+    \item \texttt{"/"} = The URL path (relative to the router's prefix)
+\end{itemize}
+
+\subsection{Line: response\_model=List[BuyerResponse]}
+This tells FastAPI:
+\begin{itemize}
+    \item The response will be a \textbf{list} of items
+    \item Each item follows the \texttt{BuyerResponse} schema
+    \item FastAPI will automatically validate and format the output
+\end{itemize}
+
+\subsection{Line: db: Session = Depends(get\_db\_clients)}
+This is \textbf{dependency injection}:
+\begin{itemize}
+    \item \texttt{Depends(get\_db\_clients)} = ``Give me a database connection''
+    \item FastAPI will automatically:
+    \begin{enumerate}
+        \item Call \texttt{get\_db\_clients()} before the function runs
+        \item Pass the database session to the function
+        \item Close the connection after the function finishes
+    \end{enumerate}
+\end{itemize}
+
+\begin{conceptbox}{Key Concept: Dependency Injection}
+Instead of creating database connections manually everywhere, you \textbf{declare} what you need, and FastAPI \textbf{provides} it automatically. This is called dependency injection.
+\end{conceptbox}
+
+\section{The Complete Request Flow}
+
+When someone calls \texttt{GET /api/v1/buyers/}:
+
+\begin{enumerate}
+    \item Request arrives at your server
+    \item \texttt{main.py} routes it to \texttt{buyers\_router}
+    \item \texttt{buyers\_router} matches \texttt{GET /} to \texttt{get\_buyers} function
+    \item FastAPI calls \texttt{get\_db\_clients()} to get database connection
+    \item Your function runs: queries database, gets buyers
+    \item FastAPI validates response against \texttt{BuyerResponse} schema
+    \item JSON response sent back to the client
+    \item Database connection is automatically closed
+\end{enumerate}
+
+\begin{center}
+\begin{tikzpicture}[
+    box/.style={rectangle, draw, minimum width=2.5cm, minimum height=1cm, align=center, font=\small},
+    arrow/.style={->, thick}
+]
+    \node[box] (req) at (0,0) {Request\\arrives};
+    \node[box] (main) at (3,0) {main.py\\routes it};
+    \node[box] (router) at (6,0) {Router\\matches};
+    \node[box] (deps) at (9,0) {Dependencies\\injected};
+    \node[box] (func) at (6,-2) {Function\\runs};
+    \node[box] (valid) at (3,-2) {Response\\validated};
+    \node[box] (resp) at (0,-2) {JSON\\returned};
+
+    \draw[arrow] (req) -- (main);
+    \draw[arrow] (main) -- (router);
+    \draw[arrow] (router) -- (deps);
+    \draw[arrow] (deps) -- (func);
+    \draw[arrow] (func) -- (valid);
+    \draw[arrow] (valid) -- (resp);
+\end{tikzpicture}
+\end{center}
+
+\section{Path Parameters vs Query Parameters}
+
+\subsection{Path Parameters}
+Part of the URL path, used for identifying a specific resource:
+
+\begin{lstlisting}
+@router.get("/{buyer_id}")
+def get_buyer(buyer_id: int, db: Session = Depends(get_db_clients)):
+    buyer = db.query(Buyer).filter(Buyer.id == buyer_id).first()
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer not found")
+    return buyer
+\end{lstlisting}
+
+URL: \texttt{/api/v1/buyers/5} $\rightarrow$ \texttt{buyer\_id = 5}
+
+\subsection{Query Parameters}
+After the \texttt{?} in the URL, used for filtering/options:
+
+\begin{lstlisting}
+@router.get("/")
+def get_buyers(
+    skip: int = Query(default=0),
+    limit: int = Query(default=100),
+    db: Session = Depends(get_db_clients)
+):
+    buyers = db.query(Buyer).offset(skip).limit(limit).all()
+    return buyers
+\end{lstlisting}
+
+URL: \texttt{/api/v1/buyers/?skip=10\&limit=5} $\rightarrow$ \texttt{skip=10, limit=5}
+
+\section{Chapter Summary}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Concept} & \textbf{Meaning} \\
+\midrule
+API & URLs that accept requests and return data \\
+HTTP Method & GET (read), POST (create), PUT (update), DELETE (remove) \\
+Status Code & Number indicating success/failure (200, 404, etc.) \\
+Route & A function that handles a specific URL + method \\
+Dependency Injection & FastAPI provides what you need automatically \\
+Path Parameter & Part of URL path (\texttt{/buyers/5}) \\
+Query Parameter & After ? in URL (\texttt{?skip=10}) \\
+\bottomrule
+\end{tabular}
+
+\begin{exercisebox}
+\begin{enumerate}
+    \item Open \texttt{modules/clients/routes/buyers.py}. List all the routes defined (hint: look for \texttt{@router.get}, \texttt{@router.post}, etc.)
+    \item What HTTP method would you use to update a buyer's email?
+    \item What status code should be returned when creating a new buyer successfully?
+    \item Find a route that uses query parameters.
+\end{enumerate}
+\end{exercisebox}
+
+
+% ============ CHAPTER 3: DATABASES AND MODELS ============
+\chapter{Databases and Models}
+
+\section{What Is a Database?}
+
+A database is where your data is permanently stored. When you create a buyer, it goes into the database. When the server restarts, the data is still there.
+
+Your system uses \textbf{PostgreSQL} --- a powerful, free database system used by many large companies.
+
+\section{Why Five Databases?}
+
+Your ERP uses \textbf{five separate databases}:
+
+\begin{tabular}{lll}
+\toprule
+\textbf{Database} & \textbf{Purpose} & \textbf{Tables} \\
+\midrule
+clients & Buyer/supplier info & buyers, suppliers, contacts, shipping, banking \\
+samples & Sample tracking & styles, variants, samples, TNA, operations \\
+users & Authentication & users \\
+orders & Order management & orders \\
+merchandiser & Future features & (empty for now) \\
+\bottomrule
+\end{tabular}
+
+\begin{notebox}
+Why separate databases?
+\begin{itemize}
+    \item \textbf{Security}: User passwords are isolated from business data
+    \item \textbf{Scalability}: Each database can be on a different server
+    \item \textbf{Organization}: Clear separation of concerns
+\end{itemize}
+\end{notebox}
+
+\section{Database Configuration}
+
+Look at \texttt{core/config.py}:
+
+\begin{lstlisting}[caption={core/config.py - Database Settings}]
+class Settings(BaseSettings):
+    # PostgreSQL Base Settings
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "root"
+    POSTGRES_PORT: str = "5432"
+
+    # Multi-Database Host Configuration
+    POSTGRES_HOST_CLIENTS: str = "db-clients"
+    POSTGRES_HOST_SAMPLES: str = "db-samples"
+    POSTGRES_HOST_USERS: str = "db-users"
+    POSTGRES_HOST_ORDERS: str = "db-orders"
+    POSTGRES_HOST_MERCHANDISER: str = "db-merchandiser"
+
+    # Database Names
+    POSTGRES_DB_CLIENTS: str = "rmg_erp_clients"
+    POSTGRES_DB_SAMPLES: str = "rmg_erp_samples"
+    POSTGRES_DB_USERS: str = "rmg_erp_users"
+    POSTGRES_DB_ORDERS: str = "rmg_erp_orders"
+    POSTGRES_DB_MERCHANDISER: str = "rmg_erp_merchandiser"
+\end{lstlisting}
+
+Each database has:
+\begin{itemize}
+    \item A \textbf{host} (server address)
+    \item A \textbf{name} (database name on that server)
+    \item Same \textbf{username/password} (for simplicity)
+\end{itemize}
+
+\section{Database Connections}
+
+Look at \texttt{core/database.py}:
+
+\begin{lstlisting}[caption={core/database.py - Database Connections}]
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+# Create engines for each database
+engines = {
+    DatabaseType.CLIENTS: create_engine(settings.DATABASE_URL_CLIENTS),
+    DatabaseType.SAMPLES: create_engine(settings.DATABASE_URL_SAMPLES),
+    DatabaseType.USERS: create_engine(settings.DATABASE_URL_USERS),
+    DatabaseType.ORDERS: create_engine(settings.DATABASE_URL_ORDERS),
+    DatabaseType.MERCHANDISER: create_engine(settings.DATABASE_URL_MERCHANDISER),
+}
+
+# Create session factories for each database
+SessionLocalClients = sessionmaker(bind=engines[DatabaseType.CLIENTS])
+SessionLocalSamples = sessionmaker(bind=engines[DatabaseType.SAMPLES])
+SessionLocalUsers = sessionmaker(bind=engines[DatabaseType.USERS])
+SessionLocalOrders = sessionmaker(bind=engines[DatabaseType.ORDERS])
+SessionLocalMerchandiser = sessionmaker(bind=engines[DatabaseType.MERCHANDISER])
+
+# Create Base classes for each database
+BaseClients = declarative_base()
+BaseSamples = declarative_base()
+BaseUsers = declarative_base()
+BaseOrders = declarative_base()
+BaseMerchandiser = declarative_base()
+\end{lstlisting}
+
+\begin{conceptbox}{Key Concepts}
+\begin{itemize}
+    \item \textbf{Engine}: The connection to a database
+    \item \textbf{Session}: A conversation with the database (query, add, commit)
+    \item \textbf{SessionLocal}: A factory that creates sessions
+    \item \textbf{Base}: The parent class for all models in that database
+\end{itemize}
+\end{conceptbox}
+
+\section{Getting Database Sessions}
+
+The \texttt{get\_db\_*} functions provide database sessions:
+
+\begin{lstlisting}[caption={core/database.py - Session Providers}]
+def get_db_clients():
+    """Get database session for clients DB"""
+    db = SessionLocalClients()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_db_users():
+    """Get database session for users DB"""
+    db = SessionLocalUsers()
+    try:
+        yield db
+    finally:
+        db.close()
+\end{lstlisting}
+
+The \texttt{yield} keyword makes this a \textbf{generator}:
+\begin{enumerate}
+    \item Creates a session
+    \item \texttt{yield db} --- gives it to your function
+    \item After your function finishes, \texttt{finally:} runs
+    \item \texttt{db.close()} --- closes the connection
+\end{enumerate}
+
+\begin{warningbox}
+Always use the correct \texttt{get\_db\_*} function for each module:
+\begin{itemize}
+    \item Buyers routes $\rightarrow$ \texttt{get\_db\_clients}
+    \item Users routes $\rightarrow$ \texttt{get\_db\_users}
+    \item Samples routes $\rightarrow$ \texttt{get\_db\_samples}
+\end{itemize}
+Using the wrong one means querying the wrong database!
+\end{warningbox}
+
+\section{What Is a Model?}
+
+A \textbf{model} is a Python class that represents a database table. Each instance of the class is one row in the table.
+
+\begin{lstlisting}[caption={modules/users/models/user.py - User Model}]
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON
+from sqlalchemy.sql import func
+from core.database import BaseUsers as Base
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False)
+    department = Column(String, nullable=True)
+    designation = Column(String, nullable=True)
+    department_access = Column(JSON, nullable=True, default=list)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+\end{lstlisting}
+
+\subsection{Breaking It Down}
+
+\textbf{Line: class User(Base)}
+\begin{itemize}
+    \item \texttt{User} is the model name
+    \item \texttt{Base} is \texttt{BaseUsers} --- this model goes in the users database
+\end{itemize}
+
+\textbf{Line: \_\_tablename\_\_ = "users"}
+\begin{itemize}
+    \item The actual table name in PostgreSQL
+\end{itemize}
+
+\textbf{Column definitions:}
+\begin{tabular}{lll}
+\toprule
+\textbf{Code} & \textbf{Meaning} \\
+\midrule
+\texttt{Column(Integer)} & Whole number \\
+\texttt{Column(String)} & Text \\
+\texttt{Column(Boolean)} & True/False \\
+\texttt{Column(DateTime)} & Date and time \\
+\texttt{Column(JSON)} & JSON data (lists, dicts) \\
+\texttt{primary\_key=True} & This is the unique ID \\
+\texttt{unique=True} & No duplicates allowed \\
+\texttt{index=True} & Faster searches on this column \\
+\texttt{nullable=False} & Required field \\
+\texttt{nullable=True} & Optional field \\
+\texttt{default=True} & Default value if not provided \\
+\bottomrule
+\end{tabular}
+
+\section{A More Complex Model: Buyer}
+
+\begin{lstlisting}[caption={modules/clients/models/client.py - Buyer Model}]
+from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from core.database import BaseClients as Base
+
+class Buyer(Base):
+    __tablename__ = "buyers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    buyer_name = Column(String, nullable=False, index=True)
+    brand_name = Column(String, nullable=True)
+    company_name = Column(String, nullable=False)
+    head_office_country = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    website = Column(String, nullable=True)
+    rating = Column(Float, nullable=True)
+    status = Column(String, nullable=True, default="active")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    contacts = relationship("ContactPerson", back_populates="buyer")
+    shipping_info = relationship("ShippingInfo", back_populates="buyer")
+\end{lstlisting}
+
+\subsection{Relationships}
+
+\texttt{relationship("ContactPerson", back\_populates="buyer")} means:
+\begin{itemize}
+    \item A buyer can have many contacts
+    \item Access them via \texttt{buyer.contacts} (returns a list)
+    \item The ContactPerson model has a \texttt{buyer} field that points back
+\end{itemize}
+
+\begin{lstlisting}[caption={ContactPerson Model with Foreign Key}]
+class ContactPerson(Base):
+    __tablename__ = "contact_persons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact_person_name = Column(String, nullable=False)
+    # ... other fields ...
+
+    # Foreign key - links to buyers table
+    buyer_id = Column(Integer, ForeignKey("buyers.id"), nullable=True)
+
+    # Relationship back to Buyer
+    buyer = relationship("Buyer", back_populates="contacts")
+\end{lstlisting}
+
+\begin{conceptbox}{Foreign Keys and Relationships}
+\begin{itemize}
+    \item \textbf{Foreign Key}: A column that references another table's ID
+    \item \texttt{buyer\_id = Column(Integer, ForeignKey("buyers.id"))}
+    \item This creates a link: ContactPerson $\rightarrow$ Buyer
+    \item \textbf{Relationship}: Makes it easy to navigate the link
+    \item \texttt{contact.buyer} --- get the buyer for this contact
+    \item \texttt{buyer.contacts} --- get all contacts for this buyer
+\end{itemize}
+\end{conceptbox}
+
+\section{Database Operations (CRUD)}
+
+CRUD = Create, Read, Update, Delete
+
+\subsection{Create}
+\begin{lstlisting}
+# Create a new buyer
+new_buyer = Buyer(
+    buyer_name="H&M",
+    company_name="H&M AB",
+    email="sourcing@hm.com"
+)
+db.add(new_buyer)      # Add to session
+db.commit()            # Save to database
+db.refresh(new_buyer)  # Get updated data (like auto-generated ID)
+\end{lstlisting}
+
+\subsection{Read}
+\begin{lstlisting}
+# Get all buyers
+buyers = db.query(Buyer).all()
+
+# Get one buyer by ID
+buyer = db.query(Buyer).filter(Buyer.id == 5).first()
+
+# Get buyers with filters
+active_buyers = db.query(Buyer).filter(Buyer.status == "active").all()
+
+# Order by
+buyers = db.query(Buyer).order_by(Buyer.id.desc()).all()
+
+# Limit results
+buyers = db.query(Buyer).limit(10).all()
+\end{lstlisting}
+
+\subsection{Update}
+\begin{lstlisting}
+# Get the buyer
+buyer = db.query(Buyer).filter(Buyer.id == 5).first()
+
+# Update fields
+buyer.email = "new.email@hm.com"
+buyer.rating = 5
+
+# Save changes
+db.commit()
+db.refresh(buyer)
+\end{lstlisting}
+
+\subsection{Delete}
+\begin{lstlisting}
+# Get the buyer
+buyer = db.query(Buyer).filter(Buyer.id == 5).first()
+
+# Delete it
+db.delete(buyer)
+db.commit()
+\end{lstlisting}
+
+\section{Chapter Summary}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Concept} & \textbf{Meaning} \\
+\midrule
+Database & Permanent storage for your data \\
+Engine & Connection to a database \\
+Session & A conversation with the database \\
+Model & Python class representing a table \\
+Column & A field in the table \\
+Primary Key & Unique identifier for each row \\
+Foreign Key & Links to another table \\
+Relationship & Easy navigation between linked tables \\
+CRUD & Create, Read, Update, Delete operations \\
+\bottomrule
+\end{tabular}
+
+\begin{exercisebox}
+\begin{enumerate}
+    \item Open \texttt{modules/clients/models/client.py}. List all the models defined.
+    \item Which database does the \texttt{Buyer} model belong to? (Hint: look at what Base it inherits from)
+    \item Find all the foreign keys in the \texttt{ContactPerson} model.
+    \item Write the SQLAlchemy query to get all suppliers from China.
+\end{enumerate}
+\end{exercisebox}
+
+
+% ============ CHAPTER 4: AUTHENTICATION ============
+\chapter{Authentication and Security}
+
+\section{Why Authentication?}
+
+Authentication answers the question: \textbf{``Who are you?''}
+
+Without authentication:
+\begin{itemize}
+    \item Anyone could see all your buyers
+    \item Anyone could delete orders
+    \item Anyone could access sensitive data
+\end{itemize}
+
+Your system uses \textbf{JWT tokens} (JSON Web Tokens) for authentication.
+
+\section{The Authentication Flow}
+
+\begin{center}
+\begin{tikzpicture}[
+    box/.style={rectangle, draw, minimum width=3cm, minimum height=1cm, align=center},
+    arrow/.style={->, thick}
+]
+    \node[box] (login) at (0,0) {1. User sends\\username + password};
+    \node[box] (verify) at (5,0) {2. Server verifies\\credentials};
+    \node[box] (token) at (10,0) {3. Server creates\\JWT token};
+    \node[box] (return) at (10,-2) {4. Token sent\\to user};
+    \node[box] (store) at (5,-2) {5. User stores\\token};
+    \node[box] (use) at (0,-2) {6. User sends token\\with every request};
+
+    \draw[arrow] (login) -- (verify);
+    \draw[arrow] (verify) -- (token);
+    \draw[arrow] (token) -- (return);
+    \draw[arrow] (return) -- (store);
+    \draw[arrow] (store) -- (use);
+\end{tikzpicture}
+\end{center}
+
+\section{Password Hashing}
+
+\begin{warningbox}
+NEVER store passwords in plain text! Always hash them.
+\end{warningbox}
+
+Hashing is a one-way transformation:
+\begin{itemize}
+    \item \texttt{"password123"} $\rightarrow$ \texttt{"\$2b\$12\$xyz..."} (hashed)
+    \item You cannot reverse a hash back to the original password
+    \item To verify: hash the input and compare hashes
+\end{itemize}
+
+From \texttt{core/security.py}:
+
+\begin{lstlisting}[caption={core/security.py - Password Functions}]
+import bcrypt as bcrypt_lib
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against a hash"""
+    return bcrypt_lib.checkpw(
+        plain_password.encode('utf-8'),
+        hashed_password.encode('utf-8')
+    )
+
+def get_password_hash(password: str) -> str:
+    """Hash a password"""
+    salt = bcrypt_lib.gensalt()
+    return bcrypt_lib.hashpw(
+        password.encode('utf-8'),
+        salt
+    ).decode('utf-8')
+\end{lstlisting}
+
+\textbf{Usage:}
+\begin{lstlisting}
+# When user registers
+hashed = get_password_hash("mypassword123")
+# Store 'hashed' in database, NOT the original password
+
+# When user logs in
+is_valid = verify_password("mypassword123", stored_hash)
+# Returns True if password matches
+\end{lstlisting}
+
+\section{JWT Tokens}
+
+JWT = JSON Web Token. It's a secure way to prove identity.
+
+A JWT has three parts (separated by dots):
+\begin{verbatim}
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+eyJzdWIiOiJhZG1pbiIsImV4cCI6MTcwNTMyMDAwMH0.
+abc123signature
+\end{verbatim}
+
+\begin{enumerate}
+    \item \textbf{Header}: Algorithm info (base64 encoded)
+    \item \textbf{Payload}: Data like username, expiration (base64 encoded)
+    \item \textbf{Signature}: Proves the token wasn't tampered with
+\end{enumerate}
+
+From \texttt{core/security.py}:
+
+\begin{lstlisting}[caption={core/security.py - Token Functions}]
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from .config import settings
+
+def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
+    """Create a JWT access token"""
+    to_encode = data.copy()
+
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM
+    )
+    return encoded_jwt
+
+def decode_token(token: str) -> dict:
+    """Decode a JWT token"""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        return payload
+    except JWTError:
+        return None
+\end{lstlisting}
+
+\begin{conceptbox}{Key Concept: SECRET\_KEY}
+The \texttt{SECRET\_KEY} is used to sign tokens. It must be:
+\begin{itemize}
+    \item Long and random (hard to guess)
+    \item Kept secret (never commit to git!)
+    \item Same across all servers (or tokens won't validate)
+\end{itemize}
+If someone gets your SECRET\_KEY, they can create fake tokens!
+\end{conceptbox}
+
+\section{The Login Process}
+
+From \texttt{modules/auth/routes/auth.py}:
+
+\begin{lstlisting}[caption={auth.py - Login Route}]
+@router.post("/login", response_model=Token)
+def login(login_data: LoginRequest, db: Session = Depends(get_db_users)):
+    """Login and get access token"""
+
+    # Step 1: Find user by username
+    user = db.query(User).filter(
+        User.username == login_data.username
+    ).first()
+
+    # Step 2: Verify password
+    if not user or not verify_password(
+        login_data.password,
+        user.hashed_password
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+
+    # Step 3: Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+
+    # Step 4: Create and return token
+    access_token = create_access_token(
+        data={"sub": user.username, "user_id": user.id}
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+\end{lstlisting}
+
+\section{Using the Token}
+
+After login, the client must send the token with every request:
+
+\begin{verbatim}
+GET /api/v1/buyers/
+Headers:
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+\end{verbatim}
+
+From \texttt{modules/auth/routes/auth.py}:
+
+\begin{lstlisting}[caption={auth.py - Get Current User}]
+@router.get("/me", response_model=UserResponse)
+def get_current_user(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db_users)
+):
+    """Get current user info from JWT token"""
+
+    # Step 1: Check if Authorization header exists
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    # Step 2: Extract token from header
+    token = authorization.replace("Bearer ", "")
+
+    # Step 3: Decode token
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+
+    # Step 4: Get username from token payload
+    username = payload.get("sub")
+
+    # Step 5: Find user in database
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+\end{lstlisting}
+
+\section{The Registration Process}
+
+\begin{lstlisting}[caption={auth.py - Register Route}]
+@router.post("/register", response_model=UserResponse,
+             status_code=status.HTTP_201_CREATED)
+def register(user_data: UserCreate, db: Session = Depends(get_db_users)):
+    """Register a new user"""
+
+    # Step 1: Check if user already exists
+    existing_user = db.query(User).filter(
+        (User.email == user_data.email) |
+        (User.username == user_data.username)
+    ).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already registered"
+        )
+
+    # Step 2: Hash the password
+    hashed_password = get_password_hash(user_data.password)
+
+    # Step 3: Create user object
+    new_user = User(
+        email=user_data.email,
+        username=user_data.username,
+        hashed_password=hashed_password,  # Store hash, NOT plain password
+        full_name=user_data.full_name,
+        department=user_data.department,
+        designation=user_data.designation,
+        department_access=user_data.department_access or []
+    )
+
+    # Step 4: Save to database
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+\end{lstlisting}
+
+\section{Security Configuration}
+
+From \texttt{core/config.py}:
+
+\begin{lstlisting}
+# JWT Settings
+SECRET_KEY: str = "your-secret-key-change-this"
+ALGORITHM: str = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+\end{lstlisting}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Purpose} \\
+\midrule
+SECRET\_KEY & Key used to sign/verify tokens \\
+ALGORITHM & HS256 = HMAC with SHA-256 \\
+ACCESS\_TOKEN\_EXPIRE\_MINUTES & How long tokens are valid \\
+\bottomrule
+\end{tabular}
+
+\section{Chapter Summary}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Concept} & \textbf{Meaning} \\
+\midrule
+Authentication & Verifying who the user is \\
+Hashing & One-way transformation of passwords \\
+bcrypt & Library for secure password hashing \\
+JWT & Token that proves user identity \\
+SECRET\_KEY & Key for signing tokens (keep secret!) \\
+Bearer Token & Token sent in Authorization header \\
+\bottomrule
+\end{tabular}
+
+\begin{exercisebox}
+\begin{enumerate}
+    \item Open \texttt{core/security.py}. What library is used for password hashing?
+    \item How long are tokens valid? (Hint: check \texttt{config.py})
+    \item In the login function, what happens if the user is inactive?
+    \item What data is stored in the JWT token payload?
+\end{enumerate}
+\end{exercisebox}
+
+
+% ============ CHAPTER 5: SCHEMAS AND VALIDATION ============
+\chapter{Schemas and Data Validation}
+
+\section{What Are Schemas?}
+
+Schemas define the \textbf{shape} of data:
+\begin{itemize}
+    \item What fields are required?
+    \item What data types are expected?
+    \item What are the default values?
+\end{itemize}
+
+Your project uses \textbf{Pydantic} for schemas.
+
+\section{Why Use Schemas?}
+
+Without schemas:
+\begin{lstlisting}
+# Anyone can send anything
+{
+    "buyer_name": 12345,        # Should be string!
+    "email": "not-an-email",    # Invalid email!
+    "rating": "five"            # Should be number!
+}
+\end{lstlisting}
+
+With schemas:
+\begin{lstlisting}
+# Pydantic validates automatically
+# Invalid data -> 422 Validation Error
+# Valid data -> Proceeds to your function
+\end{lstlisting}
+
+\section{Schema Types}
+
+You typically create three schemas for each model:
+
+\begin{tabular}{lll}
+\toprule
+\textbf{Schema} & \textbf{Purpose} & \textbf{Example} \\
+\midrule
+Base & Common fields & \texttt{BuyerBase} \\
+Create & For creating new records & \texttt{BuyerCreate} \\
+Update & For updating (all optional) & \texttt{BuyerUpdate} \\
+Response & What the API returns & \texttt{BuyerResponse} \\
+\bottomrule
+\end{tabular}
+
+\section{Buyer Schemas Example}
+
+From \texttt{modules/clients/schemas/buyer.py}:
+
+\begin{lstlisting}[caption={buyer.py - Schema Definitions}]
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+from datetime import datetime
+
+class BuyerBase(BaseModel):
+    """Common fields for all buyer schemas"""
+    buyer_name: str                          # Required string
+    brand_name: Optional[str] = None         # Optional string
+    company_name: str                        # Required string
+    head_office_country: Optional[str] = None
+    email: Optional[EmailStr] = None         # Optional, but must be valid email
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    rating: Optional[float] = None           # Optional number
+    status: Optional[str] = "active"         # Optional with default
+
+
+class BuyerCreate(BuyerBase):
+    """Schema for creating a buyer - inherits all from BuyerBase"""
+    pass
+
+
+class BuyerUpdate(BaseModel):
+    """Schema for updating - ALL fields optional"""
+    buyer_name: Optional[str] = None
+    brand_name: Optional[str] = None
+    company_name: Optional[str] = None
+    head_office_country: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    rating: Optional[float] = None
+    status: Optional[str] = None
+
+
+class BuyerResponse(BuyerBase):
+    """Schema for API responses"""
+    id: int                                  # Added by database
+    created_at: datetime                     # Added by database
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True               # Allow from ORM objects
+\end{lstlisting}
+
+\subsection{Breaking It Down}
+
+\textbf{Type hints:}
+\begin{tabular}{ll}
+\toprule
+\textbf{Hint} & \textbf{Meaning} \\
+\midrule
+\texttt{str} & Required string \\
+\texttt{Optional[str]} & Optional string (can be None) \\
+\texttt{Optional[str] = None} & Optional with default None \\
+\texttt{Optional[str] = "active"} & Optional with default "active" \\
+\texttt{EmailStr} & Must be valid email format \\
+\texttt{int} & Integer number \\
+\texttt{float} & Decimal number \\
+\texttt{datetime} & Date and time \\
+\texttt{List[str]} & List of strings \\
+\bottomrule
+\end{tabular}
+
+\textbf{from\_attributes = True:}
+\begin{itemize}
+    \item Allows Pydantic to read from SQLAlchemy model objects
+    \item Without this, \texttt{BuyerResponse(buyer\_object)} would fail
+\end{itemize}
+
+\section{How Schemas Are Used}
+
+In route definitions:
+
+\begin{lstlisting}[caption={Using Schemas in Routes}]
+@router.post("/", response_model=BuyerResponse,
+             status_code=status.HTTP_201_CREATED)
+def create_buyer(
+    buyer_data: BuyerCreate,  # Input validated against BuyerCreate
+    db: Session = Depends(get_db_clients)
+):
+    # buyer_data is guaranteed to be valid here
+    new_buyer = Buyer(**buyer_data.model_dump())
+    db.add(new_buyer)
+    db.commit()
+    db.refresh(new_buyer)
+    return new_buyer  # Output validated against BuyerResponse
+\end{lstlisting}
+
+\begin{itemize}
+    \item \texttt{buyer\_data: BuyerCreate} --- Input is validated
+    \item \texttt{response\_model=BuyerResponse} --- Output is validated
+    \item \texttt{buyer\_data.model\_dump()} --- Convert schema to dictionary
+\end{itemize}
+
+\section{Validation in Action}
+
+\textbf{Valid request:}
+\begin{verbatim}
+POST /api/v1/buyers/
+{
+    "buyer_name": "H&M",
+    "company_name": "H&M AB",
+    "email": "sourcing@hm.com"
+}
+Response: 201 Created
+\end{verbatim}
+
+\textbf{Invalid request (missing required field):}
+\begin{verbatim}
+POST /api/v1/buyers/
+{
+    "buyer_name": "H&M"
+    // company_name is missing!
+}
+Response: 422 Validation Error
+{
+    "detail": [{
+        "loc": ["body", "company_name"],
+        "msg": "field required",
+        "type": "value_error.missing"
+    }]
+}
+\end{verbatim}
+
+\textbf{Invalid request (wrong type):}
+\begin{verbatim}
+POST /api/v1/buyers/
+{
+    "buyer_name": "H&M",
+    "company_name": "H&M AB",
+    "email": "not-a-valid-email"
+}
+Response: 422 Validation Error
+{
+    "detail": [{
+        "loc": ["body", "email"],
+        "msg": "value is not a valid email address",
+        "type": "value_error.email"
+    }]
+}
+\end{verbatim}
+
+\section{Common Pydantic Features}
+
+\subsection{Field Validation}
+\begin{lstlisting}
+from pydantic import BaseModel, Field
+
+class OrderCreate(BaseModel):
+    quantity: int = Field(gt=0)           # Greater than 0
+    price: float = Field(ge=0)            # Greater or equal to 0
+    discount: float = Field(ge=0, le=100) # Between 0 and 100
+    code: str = Field(min_length=3, max_length=10)
+\end{lstlisting}
+
+\subsection{Custom Validators}
+\begin{lstlisting}
+from pydantic import BaseModel, validator
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+    @validator('password')
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        return v
+\end{lstlisting}
+
+\section{Chapter Summary}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Concept} & \textbf{Meaning} \\
+\midrule
+Schema & Definition of data shape/structure \\
+Pydantic & Library for data validation \\
+BaseModel & Parent class for all schemas \\
+Optional & Field can be None/missing \\
+response\_model & Validates API output \\
+model\_dump() & Convert schema to dictionary \\
+422 Error & Validation failed \\
+\bottomrule
+\end{tabular}
+
+\begin{exercisebox}
+\begin{enumerate}
+    \item Open \texttt{modules/clients/schemas/buyer.py}. What fields are required to create a buyer?
+    \item What's the difference between \texttt{BuyerCreate} and \texttt{BuyerUpdate}?
+    \item Why does \texttt{BuyerResponse} have \texttt{from\_attributes = True}?
+    \item What error code is returned when validation fails?
+\end{enumerate}
+\end{exercisebox}
+
+
+% ============ CHAPTER 6: COMPLETE FEATURE WALKTHROUGH ============
+\chapter{Complete Feature Walkthrough}
+
+Let's trace through a complete feature: \textbf{Creating a Buyer}.
+
+\section{The Journey of a Request}
+
+\begin{center}
+\begin{tikzpicture}[
+    box/.style={rectangle, draw, minimum width=2.8cm, minimum height=1cm, align=center, font=\small},
+    arrow/.style={->, thick}
+]
+    % Top row
+    \node[box] (client) at (0,0) {1. Client\\sends request};
+    \node[box] (main) at (4,0) {2. main.py\\receives it};
+    \node[box] (router) at (8,0) {3. Router\\matches URL};
+
+    % Middle row
+    \node[box] (schema) at (8,-2) {4. Schema\\validates input};
+    \node[box] (deps) at (4,-2) {5. Dependencies\\(get db)};
+    \node[box] (func) at (0,-2) {6. Function\\executes};
+
+    % Bottom row
+    \node[box] (db) at (0,-4) {7. Database\\query/save};
+    \node[box] (resp) at (4,-4) {8. Response\\schema};
+    \node[box] (return) at (8,-4) {9. JSON\\returned};
+
+    \draw[arrow] (client) -- (main);
+    \draw[arrow] (main) -- (router);
+    \draw[arrow] (router) -- (schema);
+    \draw[arrow] (schema) -- (deps);
+    \draw[arrow] (deps) -- (func);
+    \draw[arrow] (func) -- (db);
+    \draw[arrow] (db) -- (resp);
+    \draw[arrow] (resp) -- (return);
+\end{tikzpicture}
+\end{center}
+
+\section{Step 1: Client Sends Request}
+
+A client (website, mobile app, Postman) sends:
+
+\begin{verbatim}
+POST /api/v1/buyers/
+Content-Type: application/json
+
+{
+    "buyer_name": "Primark",
+    "company_name": "Primark Stores Limited",
+    "head_office_country": "Ireland",
+    "email": "sourcing@primark.com",
+    "status": "active"
+}
+\end{verbatim}
+
+\section{Step 2: main.py Receives Request}
+
+The request arrives at your FastAPI application in \texttt{main.py}.
+
+\begin{lstlisting}
+# From main.py
+app = FastAPI(title="RMG ERP System")
+
+# This line registered the buyers router
+app.include_router(
+    buyers_router,
+    prefix="/api/v1/buyers",  # URL starts with this
+    tags=["buyers"]
+)
+\end{lstlisting}
+
+FastAPI sees:
+\begin{itemize}
+    \item URL starts with \texttt{/api/v1/buyers}
+    \item Routes to \texttt{buyers\_router}
+\end{itemize}
+
+\section{Step 3: Router Matches URL}
+
+In \texttt{modules/clients/routes/buyers.py}:
+
+\begin{lstlisting}
+router = APIRouter()
+
+@router.post("/", response_model=BuyerResponse,
+             status_code=status.HTTP_201_CREATED)
+def create_buyer(buyer_data: BuyerCreate,
+                 db: Session = Depends(get_db_clients)):
+    ...
+\end{lstlisting}
+
+FastAPI matches:
+\begin{itemize}
+    \item Method: POST
+    \item Path: \texttt{/} (relative to \texttt{/api/v1/buyers})
+    \item Function: \texttt{create\_buyer}
+\end{itemize}
+
+\section{Step 4: Schema Validates Input}
+
+Before your function runs, FastAPI validates the JSON body against \texttt{BuyerCreate}:
+
+\begin{lstlisting}
+# From schemas/buyer.py
+class BuyerBase(BaseModel):
+    buyer_name: str                    # Required - CHECK
+    brand_name: Optional[str] = None   # Optional
+    company_name: str                  # Required - CHECK
+    head_office_country: Optional[str] = None  # Optional - CHECK
+    email: Optional[EmailStr] = None   # Optional, valid email - CHECK
+    status: Optional[str] = "active"   # Optional - CHECK
+
+class BuyerCreate(BuyerBase):
+    pass
+\end{lstlisting}
+
+The request data passes validation.
+
+\section{Step 5: Dependencies Injected}
+
+\begin{lstlisting}
+def create_buyer(buyer_data: BuyerCreate,
+                 db: Session = Depends(get_db_clients)):
+\end{lstlisting}
+
+FastAPI calls \texttt{get\_db\_clients()}:
+
+\begin{lstlisting}
+# From core/database.py
+def get_db_clients():
+    db = SessionLocalClients()  # Create database session
+    try:
+        yield db  # Give it to the function
+    finally:
+        db.close()  # Clean up after function finishes
+\end{lstlisting}
+
+Now your function has:
+\begin{itemize}
+    \item \texttt{buyer\_data} = validated \texttt{BuyerCreate} object
+    \item \texttt{db} = database session for clients database
+\end{itemize}
+
+\section{Step 6: Function Executes}
+
+\begin{lstlisting}
+@router.post("/", response_model=BuyerResponse,
+             status_code=status.HTTP_201_CREATED)
+def create_buyer(buyer_data: BuyerCreate,
+                 db: Session = Depends(get_db_clients)):
+    """Create a new buyer"""
+    try:
+        # Convert schema to dictionary, create model
+        new_buyer = Buyer(**buyer_data.model_dump())
+
+        # Add to database session
+        db.add(new_buyer)
+
+        # Save to database
+        db.commit()
+
+        # Reload to get auto-generated fields (id, created_at)
+        db.refresh(new_buyer)
+
+        return new_buyer
+    except Exception as e:
+        db.rollback()  # Undo changes on error
+        raise HTTPException(status_code=500, detail="Failed to create buyer")
+\end{lstlisting}
+
+\subsection{Line by Line}
+
+\textbf{\texttt{Buyer(**buyer\_data.model\_dump())}}
+\begin{itemize}
+    \item \texttt{buyer\_data.model\_dump()} converts schema to dictionary:
+    \begin{verbatim}
+    {
+        "buyer_name": "Primark",
+        "company_name": "Primark Stores Limited",
+        ...
+    }
+    \end{verbatim}
+    \item \texttt{Buyer(**dict)} unpacks dictionary into Buyer constructor
+    \item Creates: \texttt{Buyer(buyer\_name="Primark", company\_name="...")}
+\end{itemize}
+
+\textbf{\texttt{db.add(new\_buyer)}}
+\begin{itemize}
+    \item Marks the object to be inserted into database
+    \item Not saved yet --- just staged
+\end{itemize}
+
+\textbf{\texttt{db.commit()}}
+\begin{itemize}
+    \item Actually saves to database
+    \item Runs the SQL INSERT statement
+\end{itemize}
+
+\textbf{\texttt{db.refresh(new\_buyer)}}
+\begin{itemize}
+    \item Reloads the object from database
+    \item Gets auto-generated values (id, created\_at)
+\end{itemize}
+
+\section{Step 7: Database Operations}
+
+Behind the scenes, SQLAlchemy generates SQL:
+
+\begin{verbatim}
+INSERT INTO buyers
+    (buyer_name, company_name, head_office_country, email, status, created_at)
+VALUES
+    ('Primark', 'Primark Stores Limited', 'Ireland',
+     'sourcing@primark.com', 'active', '2024-01-15 10:30:00')
+RETURNING id, created_at, updated_at
+\end{verbatim}
+
+The database:
+\begin{enumerate}
+    \item Creates a new row
+    \item Generates ID (auto-increment)
+    \item Sets created\_at to current time
+    \item Returns the complete row
+\end{enumerate}
+
+\section{Step 8: Response Schema}
+
+The function returns \texttt{new\_buyer} (a Buyer model object).
+
+FastAPI validates it against \texttt{response\_model=BuyerResponse}:
+
+\begin{lstlisting}
+class BuyerResponse(BuyerBase):
+    id: int                              # From database
+    created_at: datetime                 # From database
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True           # Can read from ORM object
+\end{lstlisting}
+
+\section{Step 9: JSON Returned}
+
+FastAPI converts the validated response to JSON:
+
+\begin{verbatim}
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+    "id": 3,
+    "buyer_name": "Primark",
+    "brand_name": null,
+    "company_name": "Primark Stores Limited",
+    "head_office_country": "Ireland",
+    "email": "sourcing@primark.com",
+    "phone": null,
+    "website": null,
+    "rating": null,
+    "status": "active",
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": null
+}
+\end{verbatim}
+
+\section{After the Response}
+
+After the response is sent, FastAPI:
+\begin{enumerate}
+    \item Continues the \texttt{get\_db\_clients()} generator
+    \item Runs the \texttt{finally:} block
+    \item Calls \texttt{db.close()} to close the database connection
+\end{enumerate}
+
+\section{Error Handling}
+
+What if something goes wrong?
+
+\begin{lstlisting}
+try:
+    new_buyer = Buyer(**buyer_data.model_dump())
+    db.add(new_buyer)
+    db.commit()
+    db.refresh(new_buyer)
+    return new_buyer
+except Exception as e:
+    db.rollback()  # Undo any partial changes
+    logger.error(f"Buyer creation error: {e}")
+    raise HTTPException(status_code=500, detail="Failed to create buyer")
+\end{lstlisting}
+
+\begin{itemize}
+    \item \texttt{db.rollback()} --- Undoes any changes made in this session
+    \item \texttt{logger.error()} --- Logs the error for debugging
+    \item \texttt{raise HTTPException()} --- Returns error to client
+\end{itemize}
+
+\section{Chapter Summary}
+
+The complete flow:
+
+\begin{enumerate}
+    \item Request arrives at \texttt{main.py}
+    \item Routed to correct module based on URL prefix
+    \item URL + method matched to function
+    \item Input validated against request schema
+    \item Dependencies (database session) injected
+    \item Function executes business logic
+    \item Database operations performed
+    \item Output validated against response schema
+    \item JSON response returned to client
+    \item Database connection closed
+\end{enumerate}
+
+\begin{exercisebox}
+\textbf{Trace a GET Request}
+
+Trace the flow of \texttt{GET /api/v1/buyers/5}:
+\begin{enumerate}
+    \item Which router handles it?
+    \item Which function is called?
+    \item What's the path parameter?
+    \item What database query is made?
+    \item What response schema is used?
+\end{enumerate}
+\end{exercisebox}
+
+
+% ============ PART II: PRACTICE ============
+\part{Practice and Exercises}
+
+% ============ CHAPTER 7: CHALLENGES ============
+\chapter{Coding Challenges}
+
+Now it's time to prove you understand the codebase. Complete these challenges \textbf{without AI assistance}.
+
+\section{Challenge 1: Add a Field}
+
+\textbf{Task:} Add a \texttt{payment\_terms} field to the Buyer model.
+
+\textbf{Requirements:}
+\begin{itemize}
+    \item Field should be optional string
+    \item Default value: "Net 30"
+    \item Should be included in create, update, and response schemas
+\end{itemize}
+
+\textbf{Files to modify:}
+\begin{enumerate}
+    \item \texttt{modules/clients/models/client.py}
+    \item \texttt{modules/clients/schemas/buyer.py}
+\end{enumerate}
+
+\textbf{Hints:}
+\begin{itemize}
+    \item Look at how \texttt{status} field is defined
+    \item Remember to add to all relevant schemas
+\end{itemize}
+
+\section{Challenge 2: Add a New Endpoint}
+
+\textbf{Task:} Create an endpoint to get all active buyers.
+
+\textbf{Requirements:}
+\begin{itemize}
+    \item URL: \texttt{GET /api/v1/buyers/active}
+    \item Returns only buyers where \texttt{status == "active"}
+    \item Uses \texttt{BuyerResponse} schema
+\end{itemize}
+
+\textbf{File to modify:}
+\begin{itemize}
+    \item \texttt{modules/clients/routes/buyers.py}
+\end{itemize}
+
+\textbf{Hints:}
+\begin{itemize}
+    \item Look at existing \texttt{get\_buyers} function
+    \item Add \texttt{.filter()} to the query
+    \item Place the route BEFORE \texttt{/{buyer\_id}} route (order matters!)
+\end{itemize}
+
+\section{Challenge 3: Add Validation}
+
+\textbf{Task:} Add validation to ensure rating is between 1 and 5.
+
+\textbf{Requirements:}
+\begin{itemize}
+    \item Rating must be 1, 2, 3, 4, or 5 (if provided)
+    \item Should work for both create and update
+    \item Return 422 error with helpful message if invalid
+\end{itemize}
+
+\textbf{File to modify:}
+\begin{itemize}
+    \item \texttt{modules/clients/schemas/buyer.py}
+\end{itemize}
+
+\textbf{Hints:}
+\begin{itemize}
+    \item Use \texttt{Field(ge=1, le=5)} for range validation
+    \item Or use a \texttt{@validator} decorator
+\end{itemize}
+
+\section{Challenge 4: Debug This Code}
+
+The following code has bugs. Find and fix them:
+
+\begin{lstlisting}
+@router.get("/search")
+def search_buyers(name: str, db: Session = Depends(get_db_users)):
+    """Search buyers by name"""
+    buyers = db.query(Buyer).filter(
+        Buyer.buyer_name.contains(name)
+    ).all
+    return buyers
+\end{lstlisting}
+
+\textbf{Bugs to find:}
+\begin{enumerate}
+    \item Wrong database dependency
+    \item Missing parentheses
+    \item Missing response\_model
+\end{enumerate}
+
+\section{Challenge 5: Create a New Module}
+
+\textbf{Task:} Create a simple "notes" module.
+
+\textbf{Requirements:}
+\begin{itemize}
+    \item Model: Note with id, title, content, created\_at
+    \item Endpoints: GET all, GET by id, POST create
+    \item Store in samples database
+\end{itemize}
+
+\textbf{Files to create:}
+\begin{enumerate}
+    \item \texttt{modules/notes/\_\_init\_\_.py}
+    \item \texttt{modules/notes/models/note.py}
+    \item \texttt{modules/notes/schemas/note.py}
+    \item \texttt{modules/notes/routes/notes.py}
+\end{enumerate}
+
+\textbf{Also modify:}
+\begin{itemize}
+    \item \texttt{main.py} --- register the router
+\end{itemize}
+
+\section{Self-Assessment}
+
+After completing the challenges, answer honestly:
+
+\begin{enumerate}
+    \item Did you need to look at other code for reference? (This is OK!)
+    \item Did you understand WHY each change was needed?
+    \item Could you explain your changes to someone else?
+    \item Did you test your changes?
+\end{enumerate}
+
+If you completed all challenges and answered "yes" to questions 2-4, congratulations! You now truly understand your codebase.
+
+
+% ============ APPENDIX ============
+\appendix
+
+\chapter{Quick Reference}
+
+\section{Common SQLAlchemy Queries}
+
+\begin{lstlisting}
+# Get all
+items = db.query(Model).all()
+
+# Get by ID
+item = db.query(Model).filter(Model.id == 5).first()
+
+# Filter
+items = db.query(Model).filter(Model.status == "active").all()
+
+# Multiple filters
+items = db.query(Model).filter(
+    Model.status == "active",
+    Model.rating >= 4
+).all()
+
+# OR condition
+from sqlalchemy import or_
+items = db.query(Model).filter(
+    or_(Model.status == "active", Model.rating == 5)
+).all()
+
+# Order by
+items = db.query(Model).order_by(Model.id.desc()).all()
+
+# Limit and offset
+items = db.query(Model).offset(10).limit(5).all()
+
+# Count
+count = db.query(Model).filter(Model.status == "active").count()
+
+# Like (contains)
+items = db.query(Model).filter(
+    Model.name.ilike(f"%{search}%")
+).all()
+\end{lstlisting}
+
+\section{Common HTTP Status Codes}
+
+\begin{tabular}{lll}
+\toprule
+\textbf{Code} & \textbf{Constant} & \textbf{Meaning} \\
+\midrule
+200 & HTTP\_200\_OK & Success \\
+201 & HTTP\_201\_CREATED & Created successfully \\
+204 & HTTP\_204\_NO\_CONTENT & Deleted successfully \\
+400 & HTTP\_400\_BAD\_REQUEST & Bad request \\
+401 & HTTP\_401\_UNAUTHORIZED & Not authenticated \\
+403 & HTTP\_403\_FORBIDDEN & Not authorized \\
+404 & HTTP\_404\_NOT\_FOUND & Not found \\
+422 & HTTP\_422\_UNPROCESSABLE\_ENTITY & Validation error \\
+500 & HTTP\_500\_INTERNAL\_SERVER\_ERROR & Server error \\
+\bottomrule
+\end{tabular}
+
+\section{Pydantic Field Types}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{str} & String \\
+\texttt{int} & Integer \\
+\texttt{float} & Decimal number \\
+\texttt{bool} & True/False \\
+\texttt{datetime} & Date and time \\
+\texttt{date} & Date only \\
+\texttt{EmailStr} & Valid email \\
+\texttt{HttpUrl} & Valid URL \\
+\texttt{List[str]} & List of strings \\
+\texttt{Dict[str, int]} & Dictionary \\
+\texttt{Optional[str]} & String or None \\
+\bottomrule
+\end{tabular}
+
+\section{Project File Locations}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{What} & \textbf{Where} \\
+\midrule
+Entry point & \texttt{main.py} \\
+Settings & \texttt{core/config.py} \\
+Database connections & \texttt{core/database.py} \\
+Password/token functions & \texttt{core/security.py} \\
+Buyer model & \texttt{modules/clients/models/client.py} \\
+Buyer routes & \texttt{modules/clients/routes/buyers.py} \\
+Buyer schemas & \texttt{modules/clients/schemas/buyer.py} \\
+Auth routes & \texttt{modules/auth/routes/auth.py} \\
+User model & \texttt{modules/users/models/user.py} \\
+\bottomrule
+\end{tabular}
+
+
+\chapter{Glossary}
+
+\begin{description}
+    \item[API] Application Programming Interface --- a way for programs to communicate
+    \item[Backend] The server-side code that processes requests
+    \item[CRUD] Create, Read, Update, Delete --- basic database operations
+    \item[Dependency Injection] Automatically providing required resources to functions
+    \item[Endpoint] A specific URL that accepts requests
+    \item[FastAPI] Python web framework for building APIs
+    \item[Foreign Key] A database column that references another table
+    \item[Hash] One-way transformation of data (used for passwords)
+    \item[JWT] JSON Web Token --- a secure token for authentication
+    \item[Model] A Python class representing a database table
+    \item[ORM] Object-Relational Mapping --- using Python objects for database operations
+    \item[Pydantic] Library for data validation
+    \item[REST] Representational State Transfer --- API design style
+    \item[Router] Directs requests to the appropriate handler
+    \item[Schema] Definition of data structure and validation rules
+    \item[Session] A database connection/conversation
+    \item[SQLAlchemy] Python library for database operations
+\end{description}
+
+
+% ============ END ============
+\end{document}

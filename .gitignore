@@ -1,0 +1,151 @@
+# ==============================================================================
+# SOUTHERN APPARELS ERP - GIT IGNORE
+# ==============================================================================
+# Windows NUL file (device name conflict)
+nul
+.nul
+
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+*.egg-info/
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Testing
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+
+# Environment files (don't track actual .env files with secrets)
+# .env.example and env.example files ARE tracked (they're templates without secrets)
+
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+.cache/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# AI Tools & MCP Servers
+.claude/
+mcp_memory_storage/
+.kiro/
+.cursor/
+
+# MCP Server Folders (don't push to GitHub)
+mcp-browser-test/
+mcp-memory/
+
+# MCP Data Files
+.mcp-memory/
+.problem-memory.json
+.test-memory.json
+
+# MCP Screenshots
+mcp-browser-test/screenshots/
+
+# MCP Node Modules (already covered by node_modules/ but being explicit)
+mcp-*/node_modules/
+mcp-*/dist/
+
+# Uploaded files (should not be in git)
+backend/uploads/
+uploads/
+*.jpg
+*.jpeg
+*.png
+!frontend/public/*.jpg
+!frontend/public/*.jpeg
+!frontend/public/*.png
+
+# Temporary documentation files (only ignore specific temporary ones)
+CLEANUP_ANALYSIS.md
+*_STATUS.md
+*_GUIDE.md
+*_ANALYSIS.md
+*_FIX.md
+*_IMPLEMENTATION.md
+# Allow important documentation files (explicit exceptions)
+!*DEPLOYMENT*.md
+!*SETUP*.md
+!*TROUBLESHOOTING*.md
+!*COMPLETE*.md
+!*TODO*.md
+!*FIXES*.md
+!*REPORT*.md
+!README.md
+!PROXMOX*.md
+!QUICK_FIX*.md
+!CODE_REVIEW*.md
+!CODEBASE_DOCKER_ANALYSIS.md
+!DEPLOYMENT*.md
+!SETUP*.md
+!TROUBLESHOOTING*.md
+!COMPLETE*.md
+!TODO*.md
+!FIXES*.md
+!REPORT*.md
+# Allow deployment and diagnostic scripts
+!check-deployment.sh
+!**/check-deployment.sh
+!debug-docker.sh
+
+# Database diagram files (keep for reference, but ignore if large)
+# *Diagram*.csv
+
+# Auto-generated files
+backend/actual_openapi.json
+*.backup
+*.bak
+*.old
+*.tmp
+*.temp
+*~
+
+# Large documentation files (optional - uncomment if you want to ignore)
+# updated_log.md
+# updated_logs.md
+# backend/docs/*.tex

@@ -1,0 +1,47 @@
+# Environment files (don't track actual .env files with secrets)
+# .env.example IS tracked (it's a template without secrets)
+.env
+.env.local
+.env.production
+.env.*.local
+# Allow .env.example files (templates without secrets)
+!.env.example
+
+# Auto-generated files
+actual_openapi.json
+*.backup
+*.bak
+*.old
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AI Tools
+.claude/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

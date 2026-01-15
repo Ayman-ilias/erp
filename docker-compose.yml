@@ -1,0 +1,273 @@
+# ==============================================================================
+# SOUTHERN APPARELS ERP - DOCKER COMPOSE
+# ==============================================================================
+# All configuration is read from .env file in the same directory.
+# To change ports, credentials, etc., edit the .env file.
+#
+# Usage:
+#   docker-compose up -d --build
+#   docker-compose down
+#   docker-compose logs -f
+#
+# IMPORTANT: Create .env file from .env.example before running!
+#   cp .env.example .env
+#   nano .env  # Edit with your values
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # DATABASES (6 separate PostgreSQL instances)
+  # ============================================================================
+
+  db-clients:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_db_clients
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_CLIENTS}
+    volumes:
+      - db_clients:/var/lib/postgresql/data
+      - ./backups/db_clients.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  db-samples:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_db_samples
+    restart: unless-stopped
+    ports:
+      - "${DB_SAMPLES_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_SAMPLES}
+    volumes:
+      - db_samples:/var/lib/postgresql/data
+      - ./backups/db_samples.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  db-users:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_db_users
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_USERS}
+    volumes:
+      - db_users:/var/lib/postgresql/data
+      - ./backups/db_users.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  db-orders:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_db_orders
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_ORDERS}
+    volumes:
+      - db_orders:/var/lib/postgresql/data
+      - ./backups/db_orders.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  db-merchandiser:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_db_merchandiser
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_MERCHANDISER}
+    volumes:
+      - db_merchandiser:/var/lib/postgresql/data
+      - ./backups/db_merchandiser.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  db-settings:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_db_settings
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_SETTINGS}
+    volumes:
+      - db_settings:/var/lib/postgresql/data
+      - ./backups/db_settings.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  # ============================================================================
+  # REDIS CACHE
+  # ============================================================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - erp
+
+  # ============================================================================
+  # BACKEND (FastAPI)
+  # ============================================================================
+
+  backend:
+    build: ./backend
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    environment:
+      # Database credentials
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      # Database hosts
+      - POSTGRES_HOST_CLIENTS=${POSTGRES_HOST_CLIENTS}
+      - POSTGRES_HOST_SAMPLES=${POSTGRES_HOST_SAMPLES}
+      - POSTGRES_HOST_USERS=${POSTGRES_HOST_USERS}
+      - POSTGRES_HOST_ORDERS=${POSTGRES_HOST_ORDERS}
+      - POSTGRES_HOST_MERCHANDISER=${POSTGRES_HOST_MERCHANDISER}
+      - POSTGRES_HOST_SETTINGS=${POSTGRES_HOST_SETTINGS}
+      # Database names
+      - POSTGRES_DB_CLIENTS=${POSTGRES_DB_CLIENTS}
+      - POSTGRES_DB_SAMPLES=${POSTGRES_DB_SAMPLES}
+      - POSTGRES_DB_USERS=${POSTGRES_DB_USERS}
+      - POSTGRES_DB_ORDERS=${POSTGRES_DB_ORDERS}
+      - POSTGRES_DB_MERCHANDISER=${POSTGRES_DB_MERCHANDISER}
+      - POSTGRES_DB_SETTINGS=${POSTGRES_DB_SETTINGS}
+      # Redis
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB:-0}
+      # Security
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # Pool settings
+      - POOL_SIZE=${POOL_SIZE:-10}
+      - MAX_OVERFLOW=${MAX_OVERFLOW:-10}
+      # Environment
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      db-clients:
+        condition: service_healthy
+      db-samples:
+        condition: service_healthy
+      db-users:
+        condition: service_healthy
+      db-orders:
+        condition: service_healthy
+      db-merchandiser:
+        condition: service_healthy
+      db-settings:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${BACKEND_PORT:-8000}/api/v1/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - erp
+
+  # ============================================================================
+  # FRONTEND (Next.js)
+  # ============================================================================
+
+  frontend:
+    build: ./frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-erp}_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-2222}:3000"
+    environment:
+      - NODE_ENV=production
+      # Backend URL for API proxy (server-side rendering) - uses Docker service name
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8000}
+      - API_URL=${API_URL:-http://backend:8000}
+      # Public API URL for client-side (uses API masking via /api/v1)
+      - NEXT_PUBLIC_API_MASK_URL=${NEXT_PUBLIC_API_MASK_URL:-/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - erp
+
+# ==============================================================================
+# NETWORKS
+# ==============================================================================
+
+networks:
+  erp:
+    driver: bridge
+
+# ==============================================================================
+# VOLUMES
+# ==============================================================================
+
+volumes:
+  db_clients:
+  db_samples:
+  db_users:
+  db_orders:
+  db_merchandiser:
+  db_settings:
