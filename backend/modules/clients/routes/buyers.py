@@ -122,11 +122,36 @@ def delete_buyer_type(buyer_type_id: int, db: Session = Depends(get_db_clients))
 @router.post("/contacts", response_model=ContactPersonResponse, status_code=status.HTTP_201_CREATED)
 def create_contact(contact_data: ContactPersonCreate, db: Session = Depends(get_db_clients)):
     """Create a new contact person"""
-    new_contact = ContactPerson(**contact_data.model_dump())
-    db.add(new_contact)
-    db.commit()
-    db.refresh(new_contact)
-    return new_contact
+    try:
+        new_contact = ContactPerson(**contact_data.model_dump())
+        db.add(new_contact)
+        db.commit()
+        db.refresh(new_contact)
+        return new_contact
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                new_contact = ContactPerson(**contact_data.model_dump())
+                db.add(new_contact)
+                db.commit()
+                db.refresh(new_contact)
+                return new_contact
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            db.rollback()
+            logger.error(f"Contact creation error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to create contact")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Contact creation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create contact")
 
 
 @router.get("/contacts", response_model=List[ContactPersonResponse])
@@ -137,7 +162,36 @@ def get_contacts(buyer_id: int = None, db: Session = Depends(get_db_clients)):
         if buyer_id:
             query = query.filter(ContactPerson.buyer_id == buyer_id)
         return query.order_by(ContactPerson.id.desc()).all()
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                query = db.query(ContactPerson)
+                if buyer_id:
+                    query = query.filter(ContactPerson.buyer_id == buyer_id)
+                return query.order_by(ContactPerson.id.desc()).all()
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.error(f"Error fetching contacts: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch contacts: {str(e)}"
+            )
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.error(f"Error fetching contacts: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -149,11 +203,36 @@ def get_contacts(buyer_id: int = None, db: Session = Depends(get_db_clients)):
 @router.post("/shipping", response_model=ShippingInfoResponse, status_code=status.HTTP_201_CREATED)
 def create_shipping_info(shipping_data: ShippingInfoCreate, db: Session = Depends(get_db_clients)):
     """Create shipping information"""
-    new_shipping = ShippingInfo(**shipping_data.model_dump())
-    db.add(new_shipping)
-    db.commit()
-    db.refresh(new_shipping)
-    return new_shipping
+    try:
+        new_shipping = ShippingInfo(**shipping_data.model_dump())
+        db.add(new_shipping)
+        db.commit()
+        db.refresh(new_shipping)
+        return new_shipping
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                new_shipping = ShippingInfo(**shipping_data.model_dump())
+                db.add(new_shipping)
+                db.commit()
+                db.refresh(new_shipping)
+                return new_shipping
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            db.rollback()
+            logger.error(f"Shipping info creation error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to create shipping info")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Shipping info creation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create shipping info")
 
 
 @router.get("/shipping", response_model=List[ShippingInfoResponse])
@@ -164,14 +243,40 @@ def get_shipping_info(buyer_id: int = None, db: Session = Depends(get_db_clients
         if buyer_id:
             query = query.filter(ShippingInfo.buyer_id == buyer_id)
         
-        # Try with joinedload first, fallback to simple query if relationship fails
-        try:
-            shipping_info = query.options(joinedload(ShippingInfo.buyer)).order_by(ShippingInfo.id.desc()).all()
-        except Exception as rel_error:
-            logger.warning(f"Failed to load buyer relationship: {rel_error}. Loading shipping info without relationship.")
-            shipping_info = query.order_by(ShippingInfo.id.desc()).all()
+        # Use simple query without relationships to avoid transaction errors
+        shipping_info = query.order_by(ShippingInfo.id.desc()).all()
         return shipping_info
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                query = db.query(ShippingInfo)
+                if buyer_id:
+                    query = query.filter(ShippingInfo.buyer_id == buyer_id)
+                shipping_info = query.order_by(ShippingInfo.id.desc()).all()
+                return shipping_info
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.error(f"Error fetching shipping info: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch shipping info: {str(e)}"
+            )
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.error(f"Error fetching shipping info: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -183,11 +288,36 @@ def get_shipping_info(buyer_id: int = None, db: Session = Depends(get_db_clients
 @router.post("/banking", response_model=BankingInfoResponse, status_code=status.HTTP_201_CREATED)
 def create_banking_info(banking_data: BankingInfoCreate, db: Session = Depends(get_db_clients)):
     """Create banking information"""
-    new_banking = BankingInfo(**banking_data.model_dump())
-    db.add(new_banking)
-    db.commit()
-    db.refresh(new_banking)
-    return new_banking
+    try:
+        new_banking = BankingInfo(**banking_data.model_dump())
+        db.add(new_banking)
+        db.commit()
+        db.refresh(new_banking)
+        return new_banking
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                new_banking = BankingInfo(**banking_data.model_dump())
+                db.add(new_banking)
+                db.commit()
+                db.refresh(new_banking)
+                return new_banking
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            db.rollback()
+            logger.error(f"Banking info creation error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to create banking info")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Banking info creation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create banking info")
 
 
 @router.get("/banking", response_model=List[BankingInfoResponse])
@@ -195,7 +325,33 @@ def get_banking_info(db: Session = Depends(get_db_clients)):
     """Get all banking information"""
     try:
         return db.query(BankingInfo).order_by(BankingInfo.id.desc()).all()
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                return db.query(BankingInfo).order_by(BankingInfo.id.desc()).all()
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.error(f"Error fetching banking info: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch banking info: {str(e)}"
+            )
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.error(f"Error fetching banking info: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -237,77 +393,40 @@ def get_buyers(
     limit: int = Query(default=10000, ge=1, le=10000, description="Max records per request"),
     db: Session = Depends(get_db_clients)
 ):
-    """Get all buyers"""
-    # Create a fresh session if the current one is in a bad state
-    local_db = None
-    use_local = False
-    
+    """Get all buyers - using simple query without relationships to avoid transaction errors"""
     try:
-        # First, try to check if session is healthy with a simple test query
-        try:
-            db.execute(text("SELECT 1"))
-        except (OperationalError, InvalidRequestError, SQLAlchemyError) as test_error:
-            error_str = str(test_error.orig) if hasattr(test_error, 'orig') else str(test_error)
-            if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
-                logger.warning("Session in failed transaction state, creating fresh session")
-                try:
-                    db.rollback()
-                    db.close()
-                except Exception:
-                    pass
-                local_db = SessionLocalClients()
-                db = local_db
-                use_local = True
+        # Use simple query without relationships to avoid transaction errors
+        # The buyer_type relationship will be loaded lazily if needed, but won't block the query
+        buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
         
-        # Try with joinedload first for better performance
-        try:
-            buyers = db.query(Buyer).options(
-                joinedload(Buyer.buyer_type)
-            ).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-        except (OperationalError, InvalidRequestError, SQLAlchemyError) as load_error:
-            # Check if it's a transaction error
-            error_str = str(load_error.orig) if hasattr(load_error, 'orig') else str(load_error)
-            if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
-                # Rollback and create fresh session
-                try:
-                    db.rollback()
-                    if not use_local:
-                        db.close()
-                except Exception:
-                    pass
-                
-                if not use_local:
-                    local_db = SessionLocalClients()
-                    db = local_db
-                    use_local = True
-                
-                logger.warning(f"Transaction error detected, using fresh session: {str(load_error)}")
-                # Retry with simple query (no joinedload to avoid relationship issues)
-                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-            else:
-                # Other relationship loading errors - fallback to simple query
-                logger.warning(f"Failed to load buyer_type relationship: {str(load_error)}. Using simple query.")
-                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+        # Manually set buyer_type to None for any buyers with broken relationships
+        # This prevents serialization errors
+        for buyer in buyers:
+            try:
+                # Try to access buyer_type, but don't fail if it's broken
+                if buyer.buyer_type_id:
+                    _ = buyer.buyer_type
+            except Exception:
+                # If relationship is broken, set to None to prevent serialization errors
+                buyer.buyer_type_id = None
         
         return buyers
-        
     except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
         # Handle PostgreSQL transaction errors
         error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
         if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
             try:
-                if not use_local:
-                    db.rollback()
-                    db.close()
-                    local_db = SessionLocalClients()
-                    db = local_db
-                    use_local = True
-                else:
-                    db.rollback()
-                
-                # Retry once after rollback with fresh session
+                db.rollback()
+                # Retry once after rollback
                 logger.info("Retrying buyers query after transaction rollback")
                 buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+                # Clear broken relationships
+                for buyer in buyers:
+                    try:
+                        if buyer.buyer_type_id:
+                            _ = buyer.buyer_type
+                    except Exception:
+                        buyer.buyer_type_id = None
                 return buyers
             except Exception as retry_error:
                 logger.error(f"Retry after rollback also failed: {str(retry_error)}", exc_info=True)
@@ -336,13 +455,6 @@ def get_buyers(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch buyers: {str(e)}"
         )
-    finally:
-        # Close local session if we created one
-        if use_local and local_db:
-            try:
-                local_db.close()
-            except Exception:
-                pass
 
 
 @router.get("/{buyer_id}", response_model=BuyerResponse)
