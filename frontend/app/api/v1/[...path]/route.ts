@@ -51,13 +51,15 @@ async function proxyRequest(request: NextRequest, path: string[]) {
       const response = await fetch(targetUrl, fetchOptions);
       clearTimeout(timeoutId);
 
-      // Log response details for static files
-      if (path[0] === 'static') {
-        console.log('[API Proxy] Static file response:', {
+      // Log response details for static files and logo endpoints
+      if (path[0] === 'static' || (path[0] === 'settings' && path[1] === 'company-profile' && path[2] === 'logo')) {
+        console.log('[API Proxy] Image/File response:', {
           status: response.status,
           statusText: response.statusText,
           contentType: response.headers.get('content-type'),
-          url: targetUrl
+          contentLength: response.headers.get('content-length'),
+          url: targetUrl,
+          path: path.join('/')
         });
       }
 
@@ -95,7 +97,8 @@ async function proxyRequest(request: NextRequest, path: string[]) {
                        contentType.startsWith('application/octet-stream') ||
                        contentType.startsWith('application/pdf') ||
                        contentType.includes('video/') ||
-                       contentType.includes('audio/');
+                       contentType.includes('audio/') ||
+                       (path[0] === 'settings' && path[1] === 'company-profile' && path[2] === 'logo');
 
       // Create response headers
       const responseHeaders = new Headers();
@@ -110,7 +113,9 @@ async function proxyRequest(request: NextRequest, path: string[]) {
       if (isBinary) {
         // For binary content (images, files), use arrayBuffer
         const arrayBuffer = await response.arrayBuffer();
-        if (path[0] === 'static') {
+        const isLogoEndpoint = path[0] === 'settings' && path[1] === 'company-profile' && path[2] === 'logo';
+        
+        if (path[0] === 'static' || isLogoEndpoint) {
           console.log('[API Proxy] Serving binary file, size:', arrayBuffer.byteLength, 'Content-Type:', contentType);
         }
         
@@ -120,6 +125,12 @@ async function proxyRequest(request: NextRequest, path: string[]) {
         }
         responseHeaders.set('Content-Length', arrayBuffer.byteLength.toString());
         responseHeaders.set('Cache-Control', 'public, max-age=31536000, immutable');
+        
+        // Add CORS headers for images
+        if (contentType.startsWith('image/')) {
+          responseHeaders.set('Access-Control-Allow-Origin', '*');
+          responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        }
         
         return new NextResponse(arrayBuffer, {
           status: response.status,
@@ -197,4 +208,20 @@ export async function PATCH(
 ) {
   const { path } = await params;
   return proxyRequest(request, path);
+}
+
+export async function OPTIONS(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  // Handle CORS preflight requests
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Requested-With',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
 }

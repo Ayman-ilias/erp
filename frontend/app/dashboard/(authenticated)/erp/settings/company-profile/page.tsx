@@ -320,59 +320,78 @@ export default function CompanyProfilePage() {
                   {logoPreview && (
                     <div className="relative inline-block">
                       <div className="relative w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/50 flex items-center justify-center">
-                        <img
-                          key={logoPreview}
-                          src={(() => {
-                            // Construct the image URL
-                            let imageUrl = logoPreview;
-                            
-                            // Remove cache-busting parameter if present for URL construction
-                            const urlWithoutParams = imageUrl.split('?')[0];
-                            
-                            // Handle different URL formats
-                            if (urlWithoutParams.startsWith('http://') || urlWithoutParams.startsWith('https://')) {
-                              // External URL - use as is (with params)
-                              imageUrl = logoPreview;
-                            } else if (urlWithoutParams.startsWith('/api/v1/settings/company-profile/logo/')) {
-                              // Already has correct path - use as is (with params)
-                              imageUrl = logoPreview;
-                            } else if (urlWithoutParams.startsWith('/api/v1/static/company_logos/')) {
-                              // Legacy static path - convert to new endpoint
-                              const filename = urlWithoutParams.replace('/api/v1/static/company_logos/', '');
-                              imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? logoPreview.split('?')[1] : '');
-                            } else if (urlWithoutParams.startsWith('/static/')) {
-                              // Convert /static/ to new endpoint
-                              const filename = urlWithoutParams.replace('/static/company_logos/', '');
-                              imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? logoPreview.split('?')[1] : '');
-                            } else if (urlWithoutParams.startsWith('/')) {
-                              // Absolute path - use as is (with params)
-                              imageUrl = logoPreview;
-                            } else {
-                              // Relative path - assume it's a filename, use new endpoint
-                              imageUrl = `/api/v1/settings/company-profile/logo/${logoPreview}`;
-                            }
-                            
-                            console.log("Logo image URL:", imageUrl);
-                            return imageUrl;
-                          })()}
-                          alt="Company Logo"
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            console.error("Failed to load logo");
-                            console.error("Logo preview URL:", logoPreview);
-                            console.error("Attempted image src:", img.src);
-                            console.error("Full URL:", window.location.origin + img.src);
-                            // Show error toast only once
-                            if (!img.dataset.errorShown) {
-                              img.dataset.errorShown = 'true';
-                              toast.error("Failed to load logo image. The file may not exist or the path is incorrect.");
-                            }
-                          }}
-                          onLoad={() => {
-                            console.log("Logo loaded successfully from:", logoPreview);
-                          }}
-                        />
+                        {(() => {
+                          // Construct the image URL
+                          let imageUrl = logoPreview;
+                          
+                          // Remove cache-busting parameter if present for URL construction
+                          const urlWithoutParams = imageUrl.split('?')[0];
+                          
+                          // Handle different URL formats
+                          if (urlWithoutParams.startsWith('http://') || urlWithoutParams.startsWith('https://')) {
+                            // External URL - use as is (with params)
+                            imageUrl = logoPreview;
+                          } else if (urlWithoutParams.startsWith('/api/v1/settings/company-profile/logo/')) {
+                            // Already has correct path - use as is (with params)
+                            imageUrl = logoPreview;
+                          } else if (urlWithoutParams.startsWith('/api/v1/static/company_logos/')) {
+                            // Legacy static path - convert to new endpoint
+                            const filename = urlWithoutParams.replace('/api/v1/static/company_logos/', '');
+                            imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? '?' + logoPreview.split('?')[1] : '');
+                          } else if (urlWithoutParams.startsWith('/static/')) {
+                            // Convert /static/ to new endpoint
+                            const filename = urlWithoutParams.replace('/static/company_logos/', '');
+                            imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? '?' + logoPreview.split('?')[1] : '');
+                          } else if (urlWithoutParams.startsWith('/')) {
+                            // Absolute path - use as is (with params)
+                            imageUrl = logoPreview;
+                          } else {
+                            // Relative path - assume it's a filename, use new endpoint
+                            imageUrl = `/api/v1/settings/company-profile/logo/${logoPreview}`;
+                          }
+                          
+                          console.log("Logo image URL:", imageUrl);
+                          console.log("Full logo URL:", window.location.origin + imageUrl);
+                          
+                          return (
+                            <img
+                              key={imageUrl}
+                              src={imageUrl}
+                              alt="Company Logo"
+                              className="w-full h-full object-contain"
+                              crossOrigin="anonymous"
+                              onError={(e) => {
+                                const img = e.target as HTMLImageElement;
+                                console.error("Failed to load logo");
+                                console.error("Logo preview URL:", logoPreview);
+                                console.error("Constructed image URL:", imageUrl);
+                                console.error("Attempted image src:", img.src);
+                                console.error("Full URL:", window.location.origin + imageUrl);
+                                console.error("Image error details:", {
+                                  naturalWidth: img.naturalWidth,
+                                  naturalHeight: img.naturalHeight,
+                                  complete: img.complete,
+                                  src: img.src
+                                });
+                                // Show error toast only once
+                                if (!img.dataset.errorShown) {
+                                  img.dataset.errorShown = 'true';
+                                  toast.error(`Failed to load logo image. URL: ${imageUrl}`);
+                                }
+                              }}
+                              onLoad={(e) => {
+                                const img = e.target as HTMLImageElement;
+                                console.log("Logo loaded successfully!");
+                                console.log("Image details:", {
+                                  src: img.src,
+                                  naturalWidth: img.naturalWidth,
+                                  naturalHeight: img.naturalHeight,
+                                  complete: img.complete
+                                });
+                              }}
+                            />
+                          );
+                        })()}
                       </div>
                       <Button
                         type="button"
@@ -476,11 +495,19 @@ export default function CompanyProfilePage() {
                         )}
                       </div>
                       {logoInspection.logo_file?.exists && logoInspection.company_profile?.logo_url && (
-                        <div className="mt-2 p-2 bg-background rounded border">
+                        <div className="mt-2 p-2 bg-background rounded border space-y-2">
                           <div className="text-xs font-semibold mb-1">Direct Logo URL:</div>
                           <div className="text-xs break-all text-blue-600">
                             {window.location.origin}{logoInspection.company_profile.logo_url}
                           </div>
+                          <a
+                            href={`${window.location.origin}${logoInspection.company_profile.logo_url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline inline-block"
+                          >
+                            Open logo in new tab →
+                          </a>
                         </div>
                       )}
                     </div>

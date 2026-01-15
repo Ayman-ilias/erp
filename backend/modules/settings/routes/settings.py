@@ -190,12 +190,30 @@ async def get_company_logo(filename: str):
         
         logger.info(f"Serving logo file: {file_path} (type: {media_type}, size: {file_size} bytes)")
         
-        return FileResponse(
-            file_path,
+        # Read file content to ensure it's accessible
+        try:
+            with open(file_path, 'rb') as f:
+                file_content = f.read()
+            logger.info(f"Successfully read {len(file_content)} bytes from file")
+        except Exception as read_error:
+            logger.error(f"Error reading file: {read_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read logo file: {str(read_error)}"
+            )
+        
+        from fastapi.responses import Response
+        
+        return Response(
+            content=file_content,
             media_type=media_type,
             headers={
                 "Cache-Control": "public, max-age=31536000, immutable",
-                "Content-Length": str(file_size)
+                "Content-Length": str(file_size),
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
             }
         )
         
