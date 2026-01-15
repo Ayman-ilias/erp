@@ -121,8 +121,14 @@ export default function SampleRequestPage() {
     try {
       setLoading(true);
       const [reqData, buyerData, yarnData, trimsData] = await Promise.all([
-        samplesService.requests.getAll(),
-        buyersService.getAll(),
+        samplesService.requests.getAll().catch((err) => {
+          console.error("Failed to load sample requests:", err);
+          throw new Error(`Failed to load sample requests: ${err?.message || 'Unknown error'}`);
+        }),
+        buyersService.getAll().catch((err) => {
+          console.error("Failed to load buyers:", err);
+          throw new Error(`Failed to load buyers: ${err?.message || 'Unknown error'}`);
+        }),
         api.merchandiser.yarn.getAll().catch(() => []),
         api.merchandiser.trims.getAll().catch(() => []),
       ]);
@@ -130,9 +136,10 @@ export default function SampleRequestPage() {
       setBuyers(Array.isArray(buyerData) ? buyerData : []);
       setYarns(Array.isArray(yarnData) ? yarnData : []);
       setTrims(Array.isArray(trimsData) ? trimsData : []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load data:", error);
-      toast.error("Failed to load data");
+      const errorMessage = error?.message || "Failed to load data. Please check your connection and try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -249,30 +249,41 @@ def get_sample_requests(
     db: Session = Depends(get_db_samples)
 ):
     """Get all sample requests with optional filters"""
-    query = db.query(SampleRequest).options(
-        joinedload(SampleRequest.style),
-        joinedload(SampleRequest.plan).joinedload(SamplePlan.machine),
-        joinedload(SampleRequest.required_materials),
-        joinedload(SampleRequest.operations),
-        joinedload(SampleRequest.tna_items),
-        joinedload(SampleRequest.status_history),
-        joinedload(SampleRequest.workflows).joinedload(SampleWorkflow.cards)  # Load workflow data (Requirements 10.2, 10.3)
-    )
+    try:
+        query = db.query(SampleRequest).options(
+            joinedload(SampleRequest.style),
+            joinedload(SampleRequest.plan).joinedload(SamplePlan.machine),
+            joinedload(SampleRequest.required_materials),
+            joinedload(SampleRequest.operations),
+            joinedload(SampleRequest.tna_items),
+            joinedload(SampleRequest.status_history),
+            joinedload(SampleRequest.workflows).joinedload(SampleWorkflow.cards)  # Load workflow data (Requirements 10.2, 10.3)
+        )
 
-    if buyer_id:
-        query = query.filter(SampleRequest.buyer_id == buyer_id)
-    if sample_category:
-        query = query.filter(SampleRequest.sample_category == sample_category)
-    if current_status:
-        query = query.filter(SampleRequest.current_status == current_status)
+        if buyer_id:
+            query = query.filter(SampleRequest.buyer_id == buyer_id)
+        if sample_category:
+            query = query.filter(SampleRequest.sample_category == sample_category)
+        if current_status:
+            query = query.filter(SampleRequest.current_status == current_status)
 
-    results = query.order_by(SampleRequest.id.desc()).offset(skip).limit(limit).all()
-    
-    # Add workflow status to each result (Requirements 10.2, 10.3)
-    for request in results:
-        request.workflow_status = request.current_workflow_status
-    
-    return results
+        results = query.order_by(SampleRequest.id.desc()).offset(skip).limit(limit).all()
+        
+        # Add workflow status to each result (Requirements 10.2, 10.3)
+        for request in results:
+            try:
+                request.workflow_status = request.current_workflow_status
+            except Exception as e:
+                logger.warning(f"Failed to get workflow status for request {request.id}: {str(e)}")
+                request.workflow_status = None
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error loading sample requests: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load sample requests: {str(e)}"
+        )
 
 
 @router.get("/requests/by-sample-id/{sample_id}", response_model=SampleRequestResponse)
