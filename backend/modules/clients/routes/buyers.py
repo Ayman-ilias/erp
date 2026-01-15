@@ -238,7 +238,27 @@ def get_buyers(
     db: Session = Depends(get_db_clients)
 ):
     """Get all buyers"""
+    # Create a fresh session if the current one is in a bad state
+    local_db = None
+    use_local = False
+    
     try:
+        # First, try to check if session is healthy with a simple test query
+        try:
+            db.execute(text("SELECT 1"))
+        except (OperationalError, InvalidRequestError, SQLAlchemyError) as test_error:
+            error_str = str(test_error.orig) if hasattr(test_error, 'orig') else str(test_error)
+            if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+                logger.warning("Session in failed transaction state, creating fresh session")
+                try:
+                    db.rollback()
+                    db.close()
+                except Exception:
+                    pass
+                local_db = SessionLocalClients()
+                db = local_db
+                use_local = True
+        
         # Try with joinedload first for better performance
         try:
             buyers = db.query(Buyer).options(
@@ -248,12 +268,21 @@ def get_buyers(
             # Check if it's a transaction error
             error_str = str(load_error.orig) if hasattr(load_error, 'orig') else str(load_error)
             if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
-                # Rollback and retry with simple query
+                # Rollback and create fresh session
                 try:
                     db.rollback()
+                    if not use_local:
+                        db.close()
                 except Exception:
                     pass
-                logger.warning(f"Transaction error detected, rolling back and retrying: {str(load_error)}")
+                
+                if not use_local:
+                    local_db = SessionLocalClients()
+                    db = local_db
+                    use_local = True
+                
+                logger.warning(f"Transaction error detected, using fresh session: {str(load_error)}")
+                # Retry with simple query (no joinedload to avoid relationship issues)
                 buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
             else:
                 # Other relationship loading errors - fallback to simple query
@@ -261,13 +290,22 @@ def get_buyers(
                 buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
         
         return buyers
+        
     except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
         # Handle PostgreSQL transaction errors
         error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
         if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
             try:
-                db.rollback()
-                # Retry once after rollback
+                if not use_local:
+                    db.rollback()
+                    db.close()
+                    local_db = SessionLocalClients()
+                    db = local_db
+                    use_local = True
+                else:
+                    db.rollback()
+                
+                # Retry once after rollback with fresh session
                 logger.info("Retrying buyers query after transaction rollback")
                 buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
                 return buyers
@@ -298,6 +336,13 @@ def get_buyers(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch buyers: {str(e)}"
         )
+    finally:
+        # Close local session if we created one
+        if use_local and local_db:
+            try:
+                local_db.close()
+            except Exception:
+                pass
 
 
 @router.get("/{buyer_id}", response_model=BuyerResponse)
