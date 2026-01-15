@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.exc import OperationalError, InvalidRequestError, SQLAlchemyError
-from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, InvalidRequestError, SQLAlchemyError, ProgrammingError
+from sqlalchemy import text, inspect as sql_inspect
 from typing import List
 from core.database import get_db_clients, SessionLocalClients
 from core.logging import setup_logging
@@ -393,40 +393,131 @@ def get_buyers(
     limit: int = Query(default=10000, ge=1, le=10000, description="Max records per request"),
     db: Session = Depends(get_db_clients)
 ):
-    """Get all buyers - using simple query without relationships to avoid transaction errors"""
+    """Get all buyers - handles missing buyer_type_id column gracefully"""
+    # Check if buyer_type_id column exists in the database
     try:
-        # Use simple query without relationships to avoid transaction errors
-        # The buyer_type relationship will be loaded lazily if needed, but won't block the query
-        buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-        
-        # Manually set buyer_type to None for any buyers with broken relationships
-        # This prevents serialization errors
-        for buyer in buyers:
-            try:
-                # Try to access buyer_type, but don't fail if it's broken
-                if buyer.buyer_type_id:
-                    _ = buyer.buyer_type
-            except Exception:
-                # If relationship is broken, set to None to prevent serialization errors
-                buyer.buyer_type_id = None
-        
-        return buyers
+        inspector = sql_inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('buyers')]
+        has_buyer_type_id = 'buyer_type_id' in columns
+    except Exception:
+        # If inspection fails, assume column doesn't exist and use raw SQL
+        has_buyer_type_id = False
+    
+    try:
+        if not has_buyer_type_id:
+            # Column doesn't exist - use raw SQL
+            logger.debug("buyer_type_id column doesn't exist, using raw SQL query")
+            query_sql = text("""
+                SELECT id, buyer_name, brand_name, company_name, head_office_country,
+                       email, phone, website, tax_id, rating, status,
+                       created_at, updated_at
+                FROM buyers
+                ORDER BY id DESC
+                LIMIT :limit OFFSET :offset
+            """)
+            result = db.execute(query_sql, {"limit": limit, "offset": skip}).fetchall()
+            
+            # Convert to Buyer objects
+            buyers = []
+            for row in result:
+                buyer = Buyer(
+                    id=row.id,
+                    buyer_name=row.buyer_name,
+                    brand_name=row.brand_name,
+                    company_name=row.company_name,
+                    head_office_country=row.head_office_country,
+                    email=row.email,
+                    phone=row.phone,
+                    website=row.website,
+                    tax_id=row.tax_id,
+                    rating=row.rating,
+                    status=row.status,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at
+                )
+                # Set buyer_type_id to None since column doesn't exist
+                setattr(buyer, 'buyer_type_id', None)
+                buyers.append(buyer)
+            return buyers
+        else:
+            # Column exists - use normal ORM query
+            buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+            
+            # Manually set buyer_type_id to None if relationship is broken
+            for buyer in buyers:
+                try:
+                    if buyer.buyer_type_id:
+                        try:
+                            _ = buyer.buyer_type  # Try to access relationship
+                        except Exception:
+                            # If relationship is broken, set to None
+                            buyer.buyer_type_id = None
+                except AttributeError:
+                    setattr(buyer, 'buyer_type_id', None)
+            
+            return buyers
     except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
-        # Handle PostgreSQL transaction errors
         error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
-        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+        
+        # Check if it's a missing column error
+        if 'UndefinedColumn' in error_str and 'buyer_type_id' in error_str:
+            # Column doesn't exist - use raw SQL to query without buyer_type_id
+            logger.warning("buyer_type_id column doesn't exist, using raw SQL query")
             try:
                 db.rollback()
-                # Retry once after rollback
+                # Use raw SQL to query without buyer_type_id column
+                query_sql = text("""
+                    SELECT id, buyer_name, brand_name, company_name, head_office_country,
+                           email, phone, website, tax_id, rating, status,
+                           created_at, updated_at
+                    FROM buyers
+                    ORDER BY id DESC
+                    LIMIT :limit OFFSET :offset
+                """)
+                result = db.execute(query_sql, {"limit": limit, "offset": skip}).fetchall()
+                
+                # Convert to Buyer objects
+                buyers = []
+                for row in result:
+                    buyer = Buyer(
+                        id=row.id,
+                        buyer_name=row.buyer_name,
+                        brand_name=row.brand_name,
+                        company_name=row.company_name,
+                        head_office_country=row.head_office_country,
+                        email=row.email,
+                        phone=row.phone,
+                        website=row.website,
+                        tax_id=row.tax_id,
+                        rating=row.rating,
+                        status=row.status,
+                        created_at=row.created_at,
+                        updated_at=row.updated_at
+                    )
+                    # Set buyer_type_id to None since column doesn't exist
+                    setattr(buyer, 'buyer_type_id', None)
+                    buyers.append(buyer)
+                return buyers
+            except Exception as fallback_error:
+                logger.error(f"Fallback query also failed: {str(fallback_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database schema mismatch. Please contact administrator."
+                )
+        elif 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
                 logger.info("Retrying buyers query after transaction rollback")
                 buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-                # Clear broken relationships
                 for buyer in buyers:
-                    try:
-                        if buyer.buyer_type_id:
-                            _ = buyer.buyer_type
-                    except Exception:
-                        buyer.buyer_type_id = None
+                    if hasattr(buyer, 'buyer_type_id'):
+                        try:
+                            if buyer.buyer_type_id:
+                                _ = buyer.buyer_type
+                        except Exception:
+                            buyer.buyer_type_id = None
+                    else:
+                        setattr(buyer, 'buyer_type_id', None)
                 return buyers
             except Exception as retry_error:
                 logger.error(f"Retry after rollback also failed: {str(retry_error)}", exc_info=True)
@@ -445,7 +536,6 @@ def get_buyers(
                 detail=f"Failed to fetch buyers: {str(e)}"
             )
     except Exception as e:
-        # Always rollback on any other error
         try:
             db.rollback()
         except Exception:

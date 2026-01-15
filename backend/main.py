@@ -62,6 +62,9 @@ async def startup_event():
     
     # Run migrations
     try:
+        from migrations.add_buyer_types import add_buyer_types
+        add_buyer_types()
+        
         from migrations.add_buyer_name_to_sample_primary_info import add_buyer_name_column
         add_buyer_name_column()
         
