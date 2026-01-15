@@ -236,9 +236,30 @@ def get_buyers(
     db: Session = Depends(get_db_clients)
 ):
     """Get all buyers"""
-    # Use simple query like suppliers route (no relationships to avoid errors)
-    buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-    return buyers
+    try:
+        # Try with joinedload first for better performance
+        try:
+            buyers = db.query(Buyer).options(
+                joinedload(Buyer.buyer_type)
+            ).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+        except Exception as load_error:
+            # Fallback to simple query if relationship loading fails
+            logger.warning(f"Failed to load buyer_type relationship: {str(load_error)}. Using simple query.")
+            buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+            # Set buyer_type_id to None for buyers with broken relationships
+            for buyer in buyers:
+                try:
+                    _ = buyer.buyer_type  # Try to access relationship
+                except Exception:
+                    buyer.buyer_type_id = None  # Clear broken reference
+        
+        return buyers
+    except Exception as e:
+        logger.error(f"Error fetching buyers: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch buyers: {str(e)}"
+        )
 
 
 @router.get("/{buyer_id}", response_model=BuyerResponse)
