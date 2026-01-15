@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import OperationalError, InvalidRequestError
 from typing import List
 from core.database import get_db_clients
 from core.logging import setup_logging
@@ -242,10 +243,24 @@ def get_buyers(
             buyers = db.query(Buyer).options(
                 joinedload(Buyer.buyer_type)
             ).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-        except Exception as load_error:
-            # Fallback to simple query if relationship loading fails
-            logger.warning(f"Failed to load buyer_type relationship: {str(load_error)}. Using simple query.")
-            buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+        except (OperationalError, InvalidRequestError) as load_error:
+            # Check if it's a transaction error
+            error_str = str(load_error.orig) if hasattr(load_error, 'orig') else str(load_error)
+            if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+                # Rollback and retry with fresh query
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                
+                logger.warning(f"Transaction error detected, rolling back and retrying: {str(load_error)}")
+                # Retry with simple query after rollback
+                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+            else:
+                # Other relationship loading errors - fallback to simple query
+                logger.warning(f"Failed to load buyer_type relationship: {str(load_error)}. Using simple query.")
+                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+            
             # Set buyer_type_id to None for buyers with broken relationships
             for buyer in buyers:
                 try:
@@ -254,7 +269,40 @@ def get_buyers(
                     buyer.buyer_type_id = None  # Clear broken reference
         
         return buyers
+    except (OperationalError, InvalidRequestError) as e:
+        # Handle PostgreSQL transaction errors
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
+                db.rollback()
+                # Try one more time with a fresh query
+                logger.info("Retrying buyers query after transaction rollback")
+                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+                return buyers
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback also failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Database transaction error. Please try again."
+                )
+        else:
+            # Other database errors
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.error(f"Database error fetching buyers: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch buyers: {str(e)}"
+            )
     except Exception as e:
+        # Always rollback on any other error
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        
         logger.error(f"Error fetching buyers: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
