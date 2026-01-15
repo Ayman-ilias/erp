@@ -138,21 +138,46 @@ async def get_company_logo(filename: str):
     try:
         # Security: Only allow alphanumeric, dash, underscore, and dot in filename
         if not all(c.isalnum() or c in ['-', '_', '.'] for c in filename):
+            logger.warning(f"Invalid filename format: {filename}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid filename"
             )
         
         # Construct file path
-        file_path = os.path.join("uploads/company_logos", filename)
+        upload_dir = "uploads/company_logos"
+        file_path = os.path.join(upload_dir, filename)
+        absolute_path = os.path.abspath(file_path)
+        
+        logger.info(f"Attempting to serve logo: {filename}")
+        logger.info(f"File path: {file_path}")
+        logger.info(f"Absolute path: {absolute_path}")
+        
+        # Check if directory exists
+        if not os.path.exists(upload_dir):
+            logger.error(f"Upload directory does not exist: {upload_dir}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Upload directory not found: {upload_dir}"
+            )
+        
+        # List all files in directory for debugging
+        if os.path.exists(upload_dir):
+            files_in_dir = os.listdir(upload_dir)
+            logger.info(f"Files in upload directory: {files_in_dir}")
         
         # Check if file exists
         if not os.path.exists(file_path):
             logger.warning(f"Logo file not found: {file_path}")
+            logger.warning(f"Current working directory: {os.getcwd()}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Logo file not found"
+                detail=f"Logo file not found: {filename}. Available files: {', '.join(files_in_dir) if 'files_in_dir' in locals() else 'none'}"
             )
+        
+        # Check file size
+        file_size = os.path.getsize(file_path)
+        logger.info(f"Logo file found: {file_path}, size: {file_size} bytes")
         
         # Determine content type based on file extension
         file_extension = os.path.splitext(filename)[1].lower()
@@ -163,23 +188,82 @@ async def get_company_logo(filename: str):
         }
         media_type = media_type_map.get(file_extension, 'application/octet-stream')
         
-        logger.debug(f"Serving logo file: {file_path} (type: {media_type})")
+        logger.info(f"Serving logo file: {file_path} (type: {media_type}, size: {file_size} bytes)")
         
         return FileResponse(
             file_path,
             media_type=media_type,
             headers={
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Content-Length": str(file_size)
             }
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving company logo: {e}")
+        logger.error(f"Error serving company logo: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to serve logo: {str(e)}"
+        )
+
+
+@router.get("/company-profile/logo-inspect")
+def inspect_company_logo(db: Session = Depends(get_db_settings)):
+    """Inspect company logo status - debugging endpoint"""
+    try:
+        # Get company profile
+        profile = db.query(CompanyProfile).first()
+        
+        # Check upload directory
+        upload_dir = "uploads/company_logos"
+        upload_dir_exists = os.path.exists(upload_dir)
+        files_in_dir = []
+        if upload_dir_exists:
+            files_in_dir = os.listdir(upload_dir)
+        
+        # Check if logo file exists
+        logo_file_exists = False
+        logo_file_path = None
+        logo_file_size = None
+        
+        if profile and profile.logo_url:
+            # Extract filename from logo_url
+            logo_url = profile.logo_url
+            if '/logo/' in logo_url:
+                filename = logo_url.split('/logo/')[-1].split('?')[0]
+                logo_file_path = os.path.join(upload_dir, filename)
+                logo_file_exists = os.path.exists(logo_file_path)
+                if logo_file_exists:
+                    logo_file_size = os.path.getsize(logo_file_path)
+        
+        return {
+            "company_profile": {
+                "exists": profile is not None,
+                "logo_url": profile.logo_url if profile else None,
+                "company_name": profile.company_name if profile else None,
+            },
+            "upload_directory": {
+                "path": upload_dir,
+                "exists": upload_dir_exists,
+                "absolute_path": os.path.abspath(upload_dir) if upload_dir_exists else None,
+                "files": files_in_dir,
+                "file_count": len(files_in_dir),
+            },
+            "logo_file": {
+                "exists": logo_file_exists,
+                "path": logo_file_path,
+                "size_bytes": logo_file_size,
+            },
+            "current_working_directory": os.getcwd(),
+        }
+        
+    except Exception as e:
+        logger.error(f"Error inspecting company logo: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to inspect logo: {str(e)}"
         )
 
 

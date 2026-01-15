@@ -19,6 +19,8 @@ export default function CompanyProfilePage() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoInspection, setLogoInspection] = useState<any>(null);
+  const [inspecting, setInspecting] = useState(false);
   const [formData, setFormData] = useState({
     company_name: "",
     legal_name: "",
@@ -41,6 +43,43 @@ export default function CompanyProfilePage() {
       loadProfile();
     }
   }, [token, user]);
+
+  const handleInspectLogo = async () => {
+    try {
+      if (!token) {
+        toast.error("Not authenticated");
+        return;
+      }
+      setInspecting(true);
+      const inspection = await settingsService.companyProfile.inspectLogo(token);
+      setLogoInspection(inspection);
+      console.log("Logo inspection:", inspection);
+      
+      // If logo exists and has a URL, try to display it
+      if (inspection?.company_profile?.logo_url) {
+        const logoUrl = inspection.company_profile.logo_url;
+        // Convert old URL format if needed
+        let convertedUrl = logoUrl;
+        if (logoUrl.startsWith('/api/v1/static/company_logos/')) {
+          const filename = logoUrl.replace('/api/v1/static/company_logos/', '');
+          convertedUrl = `/api/v1/settings/company-profile/logo/${filename}`;
+        } else if (logoUrl.startsWith('/static/company_logos/')) {
+          const filename = logoUrl.replace('/static/company_logos/', '');
+          convertedUrl = `/api/v1/settings/company-profile/logo/${filename}`;
+        }
+        const previewUrl = convertedUrl + (convertedUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
+        setLogoPreview(previewUrl);
+        toast.success("Logo inspection completed. Check console for details.");
+      } else {
+        toast.warning("No logo URL found in company profile");
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to inspect logo");
+      console.error(error);
+    } finally {
+      setInspecting(false);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -80,6 +119,9 @@ export default function CompanyProfilePage() {
           const previewUrl = logoUrl + (logoUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
           setLogoPreview(previewUrl);
           console.log("Loaded logo URL from profile:", data.logo_url, "-> converted to:", logoUrl);
+          
+          // Auto-inspect logo after loading profile
+          handleInspectLogo();
         } else {
           setLogoPreview(null);
         }
@@ -175,6 +217,7 @@ export default function CompanyProfilePage() {
       console.error(error);
     }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,7 +387,7 @@ export default function CompanyProfilePage() {
                   )}
                   
                   {/* Upload Button */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -371,10 +414,77 @@ export default function CompanyProfilePage() {
                         </>
                       )}
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleInspectLogo}
+                      disabled={inspecting}
+                    >
+                      {inspecting ? (
+                        <>
+                          <ImageIcon className="mr-2 h-4 w-4 animate-pulse" />
+                          Inspecting...
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          Inspect Logo
+                        </>
+                      )}
+                    </Button>
                     <span className="text-sm text-muted-foreground">
                       PNG or JPG (max 5MB)
                     </span>
                   </div>
+                  
+                  {/* Inspection Results */}
+                  {logoInspection && (
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm space-y-2">
+                      <div className="font-semibold">Logo Inspection Results:</div>
+                      <div>
+                        <strong>Company Profile:</strong> {logoInspection.company_profile?.exists ? "✓ Exists" : "✗ Not found"}
+                        {logoInspection.company_profile?.logo_url && (
+                          <div className="ml-4 text-xs text-muted-foreground">
+                            URL: {logoInspection.company_profile.logo_url}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <strong>Upload Directory:</strong> {logoInspection.upload_directory?.exists ? "✓ Exists" : "✗ Not found"}
+                        {logoInspection.upload_directory?.absolute_path && (
+                          <div className="ml-4 text-xs text-muted-foreground">
+                            Path: {logoInspection.upload_directory.absolute_path}
+                          </div>
+                        )}
+                        {logoInspection.upload_directory?.files && logoInspection.upload_directory.files.length > 0 && (
+                          <div className="ml-4 text-xs text-muted-foreground">
+                            Files ({logoInspection.upload_directory.file_count}): {logoInspection.upload_directory.files.join(", ")}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <strong>Logo File:</strong> {logoInspection.logo_file?.exists ? "✓ Exists" : "✗ Not found"}
+                        {logoInspection.logo_file?.path && (
+                          <div className="ml-4 text-xs text-muted-foreground">
+                            Path: {logoInspection.logo_file.path}
+                          </div>
+                        )}
+                        {logoInspection.logo_file?.size_bytes && (
+                          <div className="ml-4 text-xs text-muted-foreground">
+                            Size: {logoInspection.logo_file.size_bytes} bytes
+                          </div>
+                        )}
+                      </div>
+                      {logoInspection.logo_file?.exists && logoInspection.company_profile?.logo_url && (
+                        <div className="mt-2 p-2 bg-background rounded border">
+                          <div className="text-xs font-semibold mb-1">Direct Logo URL:</div>
+                          <div className="text-xs break-all text-blue-600">
+                            {window.location.origin}{logoInspection.company_profile.logo_url}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Logo URL Input (for manual URL entry) */}
                   <div className="space-y-2">
