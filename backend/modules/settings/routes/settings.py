@@ -106,6 +106,16 @@ async def upload_company_logo(
         db.commit()
         db.refresh(profile)
         
+        # Verify file was saved
+        if not os.path.exists(file_path):
+            logger.error(f"Logo file was not saved correctly at {file_path}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Logo file was not saved correctly"
+            )
+        
+        logger.info(f"Logo uploaded successfully: {file_path} -> {logo_url}")
+        
         return {
             "message": "Logo uploaded successfully",
             "logo_url": logo_url,

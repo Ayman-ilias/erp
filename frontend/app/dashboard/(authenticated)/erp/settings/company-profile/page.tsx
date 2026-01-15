@@ -66,7 +66,12 @@ export default function CompanyProfilePage() {
         });
         // Set logo preview if logo_url exists
         if (data.logo_url) {
-          setLogoPreview(data.logo_url);
+          // Add cache-busting parameter to force reload
+          const previewUrl = data.logo_url + (data.logo_url.includes('?') ? '&' : '?') + `t=${Date.now()}`;
+          setLogoPreview(previewUrl);
+          console.log("Loaded logo URL from profile:", data.logo_url);
+        } else {
+          setLogoPreview(null);
         }
       }
     } catch (error) {
@@ -103,11 +108,26 @@ export default function CompanyProfilePage() {
       // Upload file first
       const result = await settingsService.companyProfile.uploadLogo(file, token);
       
-      // Update form data with new logo URL from server
-      setFormData({ ...formData, logo_url: result.logo_url });
+      // Get the logo URL from the response
+      const logoUrl = result.logo_url || result.logoUrl;
       
-      // Set preview to use the server URL (not base64)
-      setLogoPreview(result.logo_url);
+      if (!logoUrl) {
+        throw new Error("Logo URL not returned from server");
+      }
+      
+      // Update form data with new logo URL from server
+      setFormData({ ...formData, logo_url: logoUrl });
+      
+      // Set preview to use the server URL with cache-busting parameter
+      // Add timestamp to force reload if image was updated
+      const previewUrl = logoUrl + (logoUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
+      setLogoPreview(previewUrl);
+      
+      // Reload profile to ensure we have the latest data
+      await loadProfile();
+      
+      console.log("Logo uploaded, URL:", logoUrl);
+      console.log("Preview URL:", previewUrl);
       
       toast.success("Logo uploaded successfully");
     } catch (error: any) {
@@ -246,26 +266,35 @@ export default function CompanyProfilePage() {
                   {/* Logo Preview */}
                   {logoPreview && (
                     <div className="relative inline-block">
-                      <div className="relative w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/50">
+                      <div className="relative w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/50 flex items-center justify-center">
                         <img
                           key={logoPreview}
                           src={(() => {
+                            // Construct the image URL
                             let imageUrl = logoPreview;
                             
+                            // Remove cache-busting parameter if present for URL construction
+                            const urlWithoutParams = imageUrl.split('?')[0];
+                            
                             // Handle different URL formats
-                            if (logoPreview.startsWith('http://') || logoPreview.startsWith('https://')) {
-                              imageUrl = logoPreview; // External URL
-                            } else if (logoPreview.startsWith('/api/v1/static/')) {
-                              imageUrl = logoPreview; // Already has correct path
-                            } else if (logoPreview.startsWith('/static/')) {
+                            if (urlWithoutParams.startsWith('http://') || urlWithoutParams.startsWith('https://')) {
+                              // External URL - use as is (with params)
+                              imageUrl = logoPreview;
+                            } else if (urlWithoutParams.startsWith('/api/v1/static/')) {
+                              // Already has correct path - use as is (with params)
+                              imageUrl = logoPreview;
+                            } else if (urlWithoutParams.startsWith('/static/')) {
                               // Convert /static/ to /api/v1/static/
                               imageUrl = logoPreview.replace('/static/', '/api/v1/static/');
-                            } else if (logoPreview.startsWith('/')) {
-                              imageUrl = logoPreview; // Absolute path
+                            } else if (urlWithoutParams.startsWith('/')) {
+                              // Absolute path - use as is (with params)
+                              imageUrl = logoPreview;
                             } else {
-                              imageUrl = `/api/v1/static/company_logos/${logoPreview}`; // Relative path
+                              // Relative path - assume it's a filename
+                              imageUrl = `/api/v1/static/company_logos/${logoPreview}`;
                             }
                             
+                            console.log("Logo image URL:", imageUrl);
                             return imageUrl;
                           })()}
                           alt="Company Logo"
@@ -276,8 +305,11 @@ export default function CompanyProfilePage() {
                             console.error("Logo preview URL:", logoPreview);
                             console.error("Attempted image src:", img.src);
                             console.error("Full URL:", window.location.origin + img.src);
-                            // Don't show toast on every error - might be temporary network issue
-                            // toast.error("Failed to load logo image. Please check the URL or try uploading again.");
+                            // Show error toast only once
+                            if (!img.dataset.errorShown) {
+                              img.dataset.errorShown = 'true';
+                              toast.error("Failed to load logo image. The file may not exist or the path is incorrect.");
+                            }
                           }}
                           onLoad={() => {
                             console.log("Logo loaded successfully from:", logoPreview);
