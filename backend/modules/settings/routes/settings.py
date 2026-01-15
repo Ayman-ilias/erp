@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
@@ -98,10 +99,9 @@ async def upload_company_logo(
             db.commit()
             db.refresh(profile)
         
-        # Store relative path that can be served via static files
-        # Static mount is at /api/v1/static with directory "uploads"
-        # So files in uploads/company_logos/ are accessible at /api/v1/static/company_logos/
-        logo_url = f"/api/v1/static/company_logos/{unique_filename}"
+        # Store URL that uses the dedicated logo endpoint
+        # This is more reliable than StaticFiles mount through proxy
+        logo_url = f"/api/v1/settings/company-profile/logo/{unique_filename}"
         profile.logo_url = logo_url
         db.commit()
         db.refresh(profile)
@@ -129,6 +129,57 @@ async def upload_company_logo(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload logo: {str(e)}"
+        )
+
+
+@router.get("/company-profile/logo/{filename}")
+async def get_company_logo(filename: str):
+    """Serve company logo file"""
+    try:
+        # Security: Only allow alphanumeric, dash, underscore, and dot in filename
+        if not all(c.isalnum() or c in ['-', '_', '.'] for c in filename):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid filename"
+            )
+        
+        # Construct file path
+        file_path = os.path.join("uploads/company_logos", filename)
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            logger.warning(f"Logo file not found: {file_path}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Logo file not found"
+            )
+        
+        # Determine content type based on file extension
+        file_extension = os.path.splitext(filename)[1].lower()
+        media_type_map = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+        }
+        media_type = media_type_map.get(file_extension, 'application/octet-stream')
+        
+        logger.debug(f"Serving logo file: {file_path} (type: {media_type})")
+        
+        return FileResponse(
+            file_path,
+            media_type=media_type,
+            headers={
+                "Cache-Control": "public, max-age=31536000, immutable"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving company logo: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to serve logo: {str(e)}"
         )
 
 

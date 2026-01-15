@@ -51,6 +51,44 @@ async function proxyRequest(request: NextRequest, path: string[]) {
       const response = await fetch(targetUrl, fetchOptions);
       clearTimeout(timeoutId);
 
+      // Log response details for static files
+      if (path[0] === 'static') {
+        console.log('[API Proxy] Static file response:', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+          url: targetUrl
+        });
+      }
+
+      // If response is not ok, return error details
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[API Proxy] Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+          url: targetUrl
+        });
+        
+        // For static files, return a more helpful error
+        if (path[0] === 'static') {
+          return NextResponse.json(
+            { 
+              detail: `Static file not found: ${targetUrl}`,
+              status: response.status,
+              error: errorText
+            },
+            { status: response.status }
+          );
+        }
+        
+        return NextResponse.json(
+          { detail: errorText || response.statusText },
+          { status: response.status }
+        );
+      }
+
       // Get content type to determine if it's binary (image, file, etc.)
       const contentType = response.headers.get('content-type') || '';
       const isBinary = contentType.startsWith('image/') || 

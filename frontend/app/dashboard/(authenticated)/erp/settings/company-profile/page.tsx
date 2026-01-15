@@ -66,10 +66,20 @@ export default function CompanyProfilePage() {
         });
         // Set logo preview if logo_url exists
         if (data.logo_url) {
+          // Convert old static URL format to new endpoint format if needed
+          let logoUrl = data.logo_url;
+          if (logoUrl.startsWith('/api/v1/static/company_logos/')) {
+            const filename = logoUrl.replace('/api/v1/static/company_logos/', '');
+            logoUrl = `/api/v1/settings/company-profile/logo/${filename}`;
+          } else if (logoUrl.startsWith('/static/company_logos/')) {
+            const filename = logoUrl.replace('/static/company_logos/', '');
+            logoUrl = `/api/v1/settings/company-profile/logo/${filename}`;
+          }
+          
           // Add cache-busting parameter to force reload
-          const previewUrl = data.logo_url + (data.logo_url.includes('?') ? '&' : '?') + `t=${Date.now()}`;
+          const previewUrl = logoUrl + (logoUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
           setLogoPreview(previewUrl);
-          console.log("Loaded logo URL from profile:", data.logo_url);
+          console.log("Loaded logo URL from profile:", data.logo_url, "-> converted to:", logoUrl);
         } else {
           setLogoPreview(null);
         }
@@ -280,18 +290,23 @@ export default function CompanyProfilePage() {
                             if (urlWithoutParams.startsWith('http://') || urlWithoutParams.startsWith('https://')) {
                               // External URL - use as is (with params)
                               imageUrl = logoPreview;
-                            } else if (urlWithoutParams.startsWith('/api/v1/static/')) {
+                            } else if (urlWithoutParams.startsWith('/api/v1/settings/company-profile/logo/')) {
                               // Already has correct path - use as is (with params)
                               imageUrl = logoPreview;
+                            } else if (urlWithoutParams.startsWith('/api/v1/static/company_logos/')) {
+                              // Legacy static path - convert to new endpoint
+                              const filename = urlWithoutParams.replace('/api/v1/static/company_logos/', '');
+                              imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? logoPreview.split('?')[1] : '');
                             } else if (urlWithoutParams.startsWith('/static/')) {
-                              // Convert /static/ to /api/v1/static/
-                              imageUrl = logoPreview.replace('/static/', '/api/v1/static/');
+                              // Convert /static/ to new endpoint
+                              const filename = urlWithoutParams.replace('/static/company_logos/', '');
+                              imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? logoPreview.split('?')[1] : '');
                             } else if (urlWithoutParams.startsWith('/')) {
                               // Absolute path - use as is (with params)
                               imageUrl = logoPreview;
                             } else {
-                              // Relative path - assume it's a filename
-                              imageUrl = `/api/v1/static/company_logos/${logoPreview}`;
+                              // Relative path - assume it's a filename, use new endpoint
+                              imageUrl = `/api/v1/settings/company-profile/logo/${logoPreview}`;
                             }
                             
                             console.log("Logo image URL:", imageUrl);
