@@ -72,9 +72,32 @@ def get_db_clients():
     """Get database session for clients DB"""
     db = SessionLocalClients()
     try:
+        # Ensure session starts clean - rollback any existing transaction
+        # This prevents "InFailedSqlTransaction" errors from previous requests
+        try:
+            db.rollback()
+        except Exception:
+            # If rollback fails, the session is likely already clean or closed
+            # Create a fresh session to be safe
+            try:
+                db.close()
+            except Exception:
+                pass
+            db = SessionLocalClients()
+        
         yield db
+    except Exception as e:
+        # Always rollback on any error to prevent leaving connection in bad state
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
 
 
 def get_db_samples():

@@ -238,112 +238,66 @@ def get_buyers(
     db: Session = Depends(get_db_clients)
 ):
     """Get all buyers"""
-    # Helper function to check and fix session state
-    def ensure_healthy_session(session: Session) -> Session:
-        """Check if session is healthy, return fresh session if needed"""
-        try:
-            # Try a simple query to check session health
-            session.execute(text("SELECT 1"))
-            return session
-        except (OperationalError, InvalidRequestError, SQLAlchemyError) as check_error:
-            error_str = str(check_error.orig) if hasattr(check_error, 'orig') else str(check_error)
-            if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
-                logger.warning("Session in failed transaction state, creating fresh session")
-                try:
-                    session.rollback()
-                    session.close()
-                except Exception:
-                    pass
-                # Create a completely fresh session
-                return SessionLocalClients()
-            raise
-    
-    # Helper function to execute query with retry
-    def execute_query(session: Session, use_joinedload: bool = True):
-        """Execute buyers query with error handling"""
-        try:
-            if use_joinedload:
-                return session.query(Buyer).options(
-                    joinedload(Buyer.buyer_type)
-                ).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-            else:
-                return session.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
-        except (OperationalError, InvalidRequestError, SQLAlchemyError) as query_error:
-            error_str = str(query_error.orig) if hasattr(query_error, 'orig') else str(query_error)
-            if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
-                # Session is in bad state, need fresh session
-                raise query_error  # Will be caught by outer handler
-            raise
-    
-    # Use a local variable to track if we need to close a new session
-    local_db = None
-    should_close = False
-    
     try:
-        # Ensure session is healthy before querying
-        try:
-            db = ensure_healthy_session(db)
-        except Exception as health_error:
-            logger.warning(f"Session health check failed, using fresh session: {str(health_error)}")
-            local_db = SessionLocalClients()
-            db = local_db
-            should_close = True
-        
         # Try with joinedload first for better performance
         try:
-            buyers = execute_query(db, use_joinedload=True)
+            buyers = db.query(Buyer).options(
+                joinedload(Buyer.buyer_type)
+            ).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
         except (OperationalError, InvalidRequestError, SQLAlchemyError) as load_error:
+            # Check if it's a transaction error
             error_str = str(load_error.orig) if hasattr(load_error, 'orig') else str(load_error)
             if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
-                # Get fresh session and retry
-                logger.warning(f"Transaction error detected, using fresh session: {str(load_error)}")
-                if not should_close and local_db is None:
-                    try:
-                        db.rollback()
-                        db.close()
-                    except Exception:
-                        pass
-                local_db = SessionLocalClients()
-                db = local_db
-                should_close = True
-                # Retry with simple query (no joinedload to avoid relationship issues)
-                buyers = execute_query(db, use_joinedload=False)
+                # Rollback and retry with simple query
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                logger.warning(f"Transaction error detected, rolling back and retrying: {str(load_error)}")
+                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
             else:
                 # Other relationship loading errors - fallback to simple query
                 logger.warning(f"Failed to load buyer_type relationship: {str(load_error)}. Using simple query.")
-                buyers = execute_query(db, use_joinedload=False)
-        
-        # Set buyer_type_id to None for buyers with broken relationships
-        for buyer in buyers:
-            try:
-                _ = buyer.buyer_type  # Try to access relationship
-            except Exception:
-                buyer.buyer_type_id = None  # Clear broken reference
+                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
         
         return buyers
-        
-    except Exception as e:
-        # Always rollback on any error
-        try:
-            if local_db:
-                local_db.rollback()
-            else:
+    except (OperationalError, InvalidRequestError, SQLAlchemyError) as e:
+        # Handle PostgreSQL transaction errors
+        error_str = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if 'InFailedSqlTransaction' in error_str or 'current transaction is aborted' in error_str.lower():
+            try:
                 db.rollback()
+                # Retry once after rollback
+                logger.info("Retrying buyers query after transaction rollback")
+                buyers = db.query(Buyer).order_by(Buyer.id.desc()).offset(skip).limit(limit).all()
+                return buyers
+            except Exception as retry_error:
+                logger.error(f"Retry after rollback also failed: {str(retry_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database transaction error. Please try again."
+                )
+        else:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.error(f"Database error fetching buyers: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch buyers: {str(e)}"
+            )
+    except Exception as e:
+        # Always rollback on any other error
+        try:
+            db.rollback()
         except Exception:
             pass
-        
         logger.error(f"Error fetching buyers: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch buyers: {str(e)}"
         )
-    finally:
-        # Close local session if we created one
-        if should_close and local_db:
-            try:
-                local_db.close()
-            except Exception:
-                pass
 
 
 @router.get("/{buyer_id}", response_model=BuyerResponse)
