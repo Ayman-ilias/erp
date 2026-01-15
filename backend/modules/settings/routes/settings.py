@@ -67,222 +67,61 @@ async def upload_company_logo(
     file: UploadFile = File(...),
     db: Session = Depends(get_db_settings)
 ):
-    """Upload company logo (PNG, JPG)"""
-    try:
-        # Validate file type
-        allowed_extensions = {'.png', '.jpg', '.jpeg'}
-        file_extension = os.path.splitext(file.filename)[1].lower()
-        if file_extension not in allowed_extensions:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid file type. Allowed types: PNG, JPG, JPEG"
-            )
-        
-        # Create uploads directory if it doesn't exist
-        upload_dir = "uploads/company_logos"
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Generate unique filename
-        unique_filename = f"company_logo_{uuid.uuid4()}{file_extension}"
-        file_path = os.path.join(upload_dir, unique_filename)
-        
-        # Save file
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        # Update company profile with logo URL
-        profile = db.query(CompanyProfile).first()
-        if not profile:
-            profile = CompanyProfile(company_name="My Company")
-            db.add(profile)
-            db.commit()
-            db.refresh(profile)
-        
-        # Store URL that uses the dedicated logo endpoint
-        # This is more reliable than StaticFiles mount through proxy
-        logo_url = f"/api/v1/settings/company-profile/logo/{unique_filename}"
-        profile.logo_url = logo_url
-        db.commit()
-        db.refresh(profile)
-        
-        # Verify file was saved
-        if not os.path.exists(file_path):
-            logger.error(f"Logo file was not saved correctly at {file_path}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Logo file was not saved correctly"
-            )
-        
-        logger.info(f"Logo uploaded successfully: {file_path} -> {logo_url}")
-        
-        return {
-            "message": "Logo uploaded successfully",
-            "logo_url": logo_url,
-            "filename": unique_filename
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error uploading company logo: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload logo: {str(e)}"
-        )
+    """Upload company logo - simple approach"""
+    # Validate file type
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.png', '.jpg', '.jpeg']:
+        raise HTTPException(status_code=400, detail="Only PNG/JPG allowed")
+    
+    # Save file
+    upload_dir = "uploads/company_logos"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    filename = f"logo_{uuid.uuid4()}{ext}"
+    file_path = os.path.join(upload_dir, filename)
+    
+    with open(file_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    
+    # Update database
+    profile = db.query(CompanyProfile).first()
+    if not profile:
+        profile = CompanyProfile(company_name="My Company")
+        db.add(profile)
+    
+    logo_url = f"/api/v1/settings/company-profile/logo/{filename}"
+    profile.logo_url = logo_url
+    db.commit()
+    
+    return {"logo_url": logo_url}
 
 
 @router.get("/company-profile/logo/{filename}")
 async def get_company_logo(filename: str):
-    """Serve company logo file"""
-    try:
-        # Security: Only allow alphanumeric, dash, underscore, and dot in filename
-        if not all(c.isalnum() or c in ['-', '_', '.'] for c in filename):
-            logger.warning(f"Invalid filename format: {filename}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid filename"
-            )
-        
-        # Construct file path
-        upload_dir = "uploads/company_logos"
-        file_path = os.path.join(upload_dir, filename)
-        absolute_path = os.path.abspath(file_path)
-        
-        logger.info(f"Attempting to serve logo: {filename}")
-        logger.info(f"File path: {file_path}")
-        logger.info(f"Absolute path: {absolute_path}")
-        
-        # Check if directory exists
-        if not os.path.exists(upload_dir):
-            logger.error(f"Upload directory does not exist: {upload_dir}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upload directory not found: {upload_dir}"
-            )
-        
-        # List all files in directory for debugging
-        if os.path.exists(upload_dir):
-            files_in_dir = os.listdir(upload_dir)
-            logger.info(f"Files in upload directory: {files_in_dir}")
-        
-        # Check if file exists
-        if not os.path.exists(file_path):
-            logger.warning(f"Logo file not found: {file_path}")
-            logger.warning(f"Current working directory: {os.getcwd()}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Logo file not found: {filename}. Available files: {', '.join(files_in_dir) if 'files_in_dir' in locals() else 'none'}"
-            )
-        
-        # Check file size
-        file_size = os.path.getsize(file_path)
-        logger.info(f"Logo file found: {file_path}, size: {file_size} bytes")
-        
-        # Determine content type based on file extension
-        file_extension = os.path.splitext(filename)[1].lower()
-        media_type_map = {
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-        }
-        media_type = media_type_map.get(file_extension, 'application/octet-stream')
-        
-        logger.info(f"Serving logo file: {file_path} (type: {media_type}, size: {file_size} bytes)")
-        
-        # Read file content to ensure it's accessible
-        try:
-            with open(file_path, 'rb') as f:
-                file_content = f.read()
-            logger.info(f"Successfully read {len(file_content)} bytes from file")
-        except Exception as read_error:
-            logger.error(f"Error reading file: {read_error}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to read logo file: {str(read_error)}"
-            )
-        
-        from fastapi.responses import Response
-        
-        return Response(
-            content=file_content,
-            media_type=media_type,
-            headers={
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "Content-Length": str(file_size),
-                "Content-Disposition": f'inline; filename="{filename}"',
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error serving company logo: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to serve logo: {str(e)}"
-        )
+    """Serve company logo file - simple approach"""
+    file_path = os.path.join("uploads/company_logos", filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Logo not found")
+    
+    ext = os.path.splitext(filename)[1].lower()
+    media_type = 'image/png' if ext == '.png' else 'image/jpeg'
+    
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    from fastapi.responses import Response
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Access-Control-Allow-Origin": "*"}
+    )
 
 
-@router.get("/company-profile/logo-inspect")
-def inspect_company_logo(db: Session = Depends(get_db_settings)):
-    """Inspect company logo status - debugging endpoint"""
-    try:
-        # Get company profile
-        profile = db.query(CompanyProfile).first()
-        
-        # Check upload directory
-        upload_dir = "uploads/company_logos"
-        upload_dir_exists = os.path.exists(upload_dir)
-        files_in_dir = []
-        if upload_dir_exists:
-            files_in_dir = os.listdir(upload_dir)
-        
-        # Check if logo file exists
-        logo_file_exists = False
-        logo_file_path = None
-        logo_file_size = None
-        
-        if profile and profile.logo_url:
-            # Extract filename from logo_url
-            logo_url = profile.logo_url
-            if '/logo/' in logo_url:
-                filename = logo_url.split('/logo/')[-1].split('?')[0]
-                logo_file_path = os.path.join(upload_dir, filename)
-                logo_file_exists = os.path.exists(logo_file_path)
-                if logo_file_exists:
-                    logo_file_size = os.path.getsize(logo_file_path)
-        
-        return {
-            "company_profile": {
-                "exists": profile is not None,
-                "logo_url": profile.logo_url if profile else None,
-                "company_name": profile.company_name if profile else None,
-            },
-            "upload_directory": {
-                "path": upload_dir,
-                "exists": upload_dir_exists,
-                "absolute_path": os.path.abspath(upload_dir) if upload_dir_exists else None,
-                "files": files_in_dir,
-                "file_count": len(files_in_dir),
-            },
-            "logo_file": {
-                "exists": logo_file_exists,
-                "path": logo_file_path,
-                "size_bytes": logo_file_size,
-            },
-            "current_working_directory": os.getcwd(),
-        }
-        
-    except Exception as e:
-        logger.error(f"Error inspecting company logo: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to inspect logo: {str(e)}"
-        )
 
 
 @router.put("/company-profile", response_model=CompanyProfileResponse)

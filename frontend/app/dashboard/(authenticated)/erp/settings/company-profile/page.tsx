@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Save, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Shield, Save, Upload, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { settingsService } from "@/services/api";
 import { toast } from "sonner";
@@ -18,9 +18,7 @@ export default function CompanyProfilePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoInspection, setLogoInspection] = useState<any>(null);
-  const [inspecting, setInspecting] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string>("");
   const [formData, setFormData] = useState({
     company_name: "",
     legal_name: "",
@@ -44,43 +42,6 @@ export default function CompanyProfilePage() {
     }
   }, [token, user]);
 
-  const handleInspectLogo = async () => {
-    try {
-      if (!token) {
-        toast.error("Not authenticated");
-        return;
-      }
-      setInspecting(true);
-      const inspection = await settingsService.companyProfile.inspectLogo(token);
-      setLogoInspection(inspection);
-      console.log("Logo inspection:", inspection);
-      
-      // If logo exists and has a URL, try to display it
-      if (inspection?.company_profile?.logo_url) {
-        const logoUrl = inspection.company_profile.logo_url;
-        // Convert old URL format if needed
-        let convertedUrl = logoUrl;
-        if (logoUrl.startsWith('/api/v1/static/company_logos/')) {
-          const filename = logoUrl.replace('/api/v1/static/company_logos/', '');
-          convertedUrl = `/api/v1/settings/company-profile/logo/${filename}`;
-        } else if (logoUrl.startsWith('/static/company_logos/')) {
-          const filename = logoUrl.replace('/static/company_logos/', '');
-          convertedUrl = `/api/v1/settings/company-profile/logo/${filename}`;
-        }
-        const previewUrl = convertedUrl + (convertedUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
-        setLogoPreview(previewUrl);
-        toast.success("Logo inspection completed. Check console for details.");
-      } else {
-        toast.warning("No logo URL found in company profile");
-      }
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to inspect logo");
-      console.error(error);
-    } finally {
-      setInspecting(false);
-    }
-  };
-
   const loadProfile = async () => {
     try {
       if (!token) return;
@@ -103,27 +64,8 @@ export default function CompanyProfilePage() {
           default_currency_id: data.default_currency_id?.toString() || "",
           fiscal_year_start_month: data.fiscal_year_start_month || 1,
         });
-        // Set logo preview if logo_url exists
         if (data.logo_url) {
-          // Convert old static URL format to new endpoint format if needed
-          let logoUrl = data.logo_url;
-          if (logoUrl.startsWith('/api/v1/static/company_logos/')) {
-            const filename = logoUrl.replace('/api/v1/static/company_logos/', '');
-            logoUrl = `/api/v1/settings/company-profile/logo/${filename}`;
-          } else if (logoUrl.startsWith('/static/company_logos/')) {
-            const filename = logoUrl.replace('/static/company_logos/', '');
-            logoUrl = `/api/v1/settings/company-profile/logo/${filename}`;
-          }
-          
-          // Add cache-busting parameter to force reload
-          const previewUrl = logoUrl + (logoUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
-          setLogoPreview(previewUrl);
-          console.log("Loaded logo URL from profile:", data.logo_url, "-> converted to:", logoUrl);
-          
-          // Auto-inspect logo after loading profile
-          handleInspectLogo();
-        } else {
-          setLogoPreview(null);
+          setLogoUrl(data.logo_url);
         }
       }
     } catch (error) {
@@ -137,16 +79,13 @@ export default function CompanyProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Invalid file type. Please upload a PNG or JPG image.");
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      toast.error("Only PNG or JPG images allowed");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size too large. Please upload an image smaller than 5MB.");
+      toast.error("File too large. Max 5MB");
       return;
     }
 
@@ -157,37 +96,17 @@ export default function CompanyProfilePage() {
       }
       setUploadingLogo(true);
 
-      // Upload file first
       const result = await settingsService.companyProfile.uploadLogo(file, token);
       
-      // Get the logo URL from the response
-      const logoUrl = result.logo_url || result.logoUrl;
-      
-      if (!logoUrl) {
-        throw new Error("Logo URL not returned from server");
+      if (result.logo_url) {
+        setLogoUrl(result.logo_url);
+        setFormData({ ...formData, logo_url: result.logo_url });
+        toast.success("Logo uploaded!");
       }
-      
-      // Update form data with new logo URL from server
-      setFormData({ ...formData, logo_url: logoUrl });
-      
-      // Set preview to use the server URL with cache-busting parameter
-      // Add timestamp to force reload if image was updated
-      const previewUrl = logoUrl + (logoUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`;
-      setLogoPreview(previewUrl);
-      
-      // Reload profile to ensure we have the latest data
-      await loadProfile();
-      
-      console.log("Logo uploaded, URL:", logoUrl);
-      console.log("Preview URL:", previewUrl);
-      
-      toast.success("Logo uploaded successfully");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to upload logo");
-      console.error(error);
+      toast.error(error?.message || "Upload failed");
     } finally {
       setUploadingLogo(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -196,28 +115,19 @@ export default function CompanyProfilePage() {
 
   const handleRemoveLogo = async () => {
     try {
-      if (!token) {
-        toast.error("Not authenticated");
-        return;
-      }
-      // Update form data and save to database
+      if (!token) return;
       const updatedData = { ...formData, logo_url: "" };
       setFormData(updatedData);
-      setLogoPreview(null);
-      
-      // Save the change to database
-      const data = {
+      setLogoUrl("");
+      await settingsService.companyProfile.update({
         ...updatedData,
         default_currency_id: updatedData.default_currency_id ? parseInt(updatedData.default_currency_id) : null,
-      };
-      await settingsService.companyProfile.update(data, token);
-      toast.success("Logo removed successfully");
+      }, token);
+      toast.success("Logo removed");
     } catch (error: any) {
       toast.error("Failed to remove logo");
-      console.error(error);
     }
   };
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,10 +142,9 @@ export default function CompanyProfilePage() {
         default_currency_id: formData.default_currency_id ? parseInt(formData.default_currency_id) : null,
       };
       await settingsService.companyProfile.update(data, token);
-      toast.success("Company profile saved successfully");
+      toast.success("Saved successfully");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to save company profile");
-      console.error(error);
+      toast.error(error?.message || "Save failed");
     } finally {
       setSaving(false);
     }
@@ -313,85 +222,21 @@ export default function CompanyProfilePage() {
                   />
                 </div>
               </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="logo">Company Logo</Label>
                 <div className="space-y-4">
-                  {/* Logo Preview */}
-                  {logoPreview && (
+                  {logoUrl && (
                     <div className="relative inline-block">
-                      <div className="relative w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/50 flex items-center justify-center">
-                        {(() => {
-                          // Construct the image URL
-                          let imageUrl = logoPreview;
-                          
-                          // Remove cache-busting parameter if present for URL construction
-                          const urlWithoutParams = imageUrl.split('?')[0];
-                          
-                          // Handle different URL formats
-                          if (urlWithoutParams.startsWith('http://') || urlWithoutParams.startsWith('https://')) {
-                            // External URL - use as is (with params)
-                            imageUrl = logoPreview;
-                          } else if (urlWithoutParams.startsWith('/api/v1/settings/company-profile/logo/')) {
-                            // Already has correct path - use as is (with params)
-                            imageUrl = logoPreview;
-                          } else if (urlWithoutParams.startsWith('/api/v1/static/company_logos/')) {
-                            // Legacy static path - convert to new endpoint
-                            const filename = urlWithoutParams.replace('/api/v1/static/company_logos/', '');
-                            imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? '?' + logoPreview.split('?')[1] : '');
-                          } else if (urlWithoutParams.startsWith('/static/')) {
-                            // Convert /static/ to new endpoint
-                            const filename = urlWithoutParams.replace('/static/company_logos/', '');
-                            imageUrl = `/api/v1/settings/company-profile/logo/${filename}` + (logoPreview.includes('?') ? '?' + logoPreview.split('?')[1] : '');
-                          } else if (urlWithoutParams.startsWith('/')) {
-                            // Absolute path - use as is (with params)
-                            imageUrl = logoPreview;
-                          } else {
-                            // Relative path - assume it's a filename, use new endpoint
-                            imageUrl = `/api/v1/settings/company-profile/logo/${logoPreview}`;
-                          }
-                          
-                          console.log("Logo image URL:", imageUrl);
-                          console.log("Full logo URL:", window.location.origin + imageUrl);
-                          
-                          return (
-                            <img
-                              key={imageUrl}
-                              src={imageUrl}
-                              alt="Company Logo"
-                              className="w-full h-full object-contain"
-                              crossOrigin="anonymous"
-                              onError={(e) => {
-                                const img = e.target as HTMLImageElement;
-                                console.error("Failed to load logo");
-                                console.error("Logo preview URL:", logoPreview);
-                                console.error("Constructed image URL:", imageUrl);
-                                console.error("Attempted image src:", img.src);
-                                console.error("Full URL:", window.location.origin + imageUrl);
-                                console.error("Image error details:", {
-                                  naturalWidth: img.naturalWidth,
-                                  naturalHeight: img.naturalHeight,
-                                  complete: img.complete,
-                                  src: img.src
-                                });
-                                // Show error toast only once
-                                if (!img.dataset.errorShown) {
-                                  img.dataset.errorShown = 'true';
-                                  toast.error(`Failed to load logo image. URL: ${imageUrl}`);
-                                }
-                              }}
-                              onLoad={(e) => {
-                                const img = e.target as HTMLImageElement;
-                                console.log("Logo loaded successfully!");
-                                console.log("Image details:", {
-                                  src: img.src,
-                                  naturalWidth: img.naturalWidth,
-                                  naturalHeight: img.naturalHeight,
-                                  complete: img.complete
-                                });
-                              }}
-                            />
-                          );
-                        })()}
+                      <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/50">
+                        <img
+                          src={logoUrl}
+                          alt="Company Logo"
+                          className="w-full h-full object-contain"
+                          onError={() => {
+                            toast.error("Failed to load logo");
+                          }}
+                        />
                       </div>
                       <Button
                         type="button"
@@ -405,8 +250,7 @@ export default function CompanyProfilePage() {
                     </div>
                   )}
                   
-                  {/* Upload Button */}
-                  <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-4">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -429,108 +273,13 @@ export default function CompanyProfilePage() {
                       ) : (
                         <>
                           <Upload className="mr-2 h-4 w-4" />
-                          {logoPreview ? "Change Logo" : "Upload Logo"}
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleInspectLogo}
-                      disabled={inspecting}
-                    >
-                      {inspecting ? (
-                        <>
-                          <ImageIcon className="mr-2 h-4 w-4 animate-pulse" />
-                          Inspecting...
-                        </>
-                      ) : (
-                        <>
-                          <ImageIcon className="mr-2 h-4 w-4" />
-                          Inspect Logo
+                          {logoUrl ? "Change Logo" : "Upload Logo"}
                         </>
                       )}
                     </Button>
                     <span className="text-sm text-muted-foreground">
                       PNG or JPG (max 5MB)
                     </span>
-                  </div>
-                  
-                  {/* Inspection Results */}
-                  {logoInspection && (
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm space-y-2">
-                      <div className="font-semibold">Logo Inspection Results:</div>
-                      <div>
-                        <strong>Company Profile:</strong> {logoInspection.company_profile?.exists ? "✓ Exists" : "✗ Not found"}
-                        {logoInspection.company_profile?.logo_url && (
-                          <div className="ml-4 text-xs text-muted-foreground">
-                            URL: {logoInspection.company_profile.logo_url}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <strong>Upload Directory:</strong> {logoInspection.upload_directory?.exists ? "✓ Exists" : "✗ Not found"}
-                        {logoInspection.upload_directory?.absolute_path && (
-                          <div className="ml-4 text-xs text-muted-foreground">
-                            Path: {logoInspection.upload_directory.absolute_path}
-                          </div>
-                        )}
-                        {logoInspection.upload_directory?.files && logoInspection.upload_directory.files.length > 0 && (
-                          <div className="ml-4 text-xs text-muted-foreground">
-                            Files ({logoInspection.upload_directory.file_count}): {logoInspection.upload_directory.files.join(", ")}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <strong>Logo File:</strong> {logoInspection.logo_file?.exists ? "✓ Exists" : "✗ Not found"}
-                        {logoInspection.logo_file?.path && (
-                          <div className="ml-4 text-xs text-muted-foreground">
-                            Path: {logoInspection.logo_file.path}
-                          </div>
-                        )}
-                        {logoInspection.logo_file?.size_bytes && (
-                          <div className="ml-4 text-xs text-muted-foreground">
-                            Size: {logoInspection.logo_file.size_bytes} bytes
-                          </div>
-                        )}
-                      </div>
-                      {logoInspection.logo_file?.exists && logoInspection.company_profile?.logo_url && (
-                        <div className="mt-2 p-2 bg-background rounded border space-y-2">
-                          <div className="text-xs font-semibold mb-1">Direct Logo URL:</div>
-                          <div className="text-xs break-all text-blue-600">
-                            {window.location.origin}{logoInspection.company_profile.logo_url}
-                          </div>
-                          <a
-                            href={`${window.location.origin}${logoInspection.company_profile.logo_url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline inline-block"
-                          >
-                            Open logo in new tab →
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Logo URL Input (for manual URL entry) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="logo_url" className="text-sm text-muted-foreground">
-                      Or enter logo URL manually
-                    </Label>
-                    <Input
-                      id="logo_url"
-                      value={formData.logo_url}
-                      onChange={(e) => {
-                        setFormData({ ...formData, logo_url: e.target.value });
-                        if (e.target.value) {
-                          setLogoPreview(e.target.value);
-                        } else {
-                          setLogoPreview(null);
-                        }
-                      }}
-                      placeholder="https://example.com/logo.png or /static/uploads/company_logos/logo.png"
-                    />
                   </div>
                 </div>
               </div>

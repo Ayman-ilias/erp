@@ -2490,10 +2490,6 @@ export const settingsService = {
       
       return await response.json();
     },
-    inspectLogo: async (token: string) => {
-      const basePath = getBasePath();
-      return getAPIResponse(basePath, "/settings/company-profile/logo-inspect", token, "GET");
-    },
   },
 
   // Branches
