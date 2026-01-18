@@ -195,6 +195,17 @@ class ManufacturingOperationResponse(ManufacturingOperationBase):
 # SAMPLE REQUIRED MATERIAL SCHEMAS
 # =============================================================================
 
+class UnitInfo(BaseModel):
+    """Schema for unit details from db-units database"""
+    id: int
+    name: str
+    symbol: str
+    category_name: str
+
+    class Config:
+        from_attributes = True
+
+
 class SampleRequiredMaterialBase(BaseModel):
     product_category: Optional[str] = None
     product_id: Optional[str] = None
@@ -202,12 +213,12 @@ class SampleRequiredMaterialBase(BaseModel):
     category: Optional[str] = None
     sub_category: Optional[str] = None
     required_quantity: float
-    uom: str
-    remarks: Optional[str] = None
 
 
 class SampleRequiredMaterialCreate(SampleRequiredMaterialBase):
     sample_request_id: int
+    unit_id: int = Field(..., gt=0, description="Reference to unit in db-units")
+    remarks: Optional[str] = None
 
 
 class SampleRequiredMaterialUpdate(BaseModel):
@@ -217,13 +228,16 @@ class SampleRequiredMaterialUpdate(BaseModel):
     category: Optional[str] = None
     sub_category: Optional[str] = None
     required_quantity: Optional[float] = None
-    uom: Optional[str] = None
+    unit_id: Optional[int] = Field(None, gt=0, description="Reference to unit in db-units")
     remarks: Optional[str] = None
 
 
 class SampleRequiredMaterialResponse(SampleRequiredMaterialBase):
     id: int
     sample_request_id: int
+    unit_id: int
+    unit: Optional[UnitInfo] = Field(None, description="Unit details populated from db-units")
+    remarks: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -388,7 +402,7 @@ class SampleRequestBase(BaseModel):
 
     # Technical specs
     gauge: Optional[str] = None
-    ply: Optional[int] = None
+    ply: Optional[str] = None
     item: Optional[str] = None
 
     # Material references
@@ -396,7 +410,7 @@ class SampleRequestBase(BaseModel):
     yarn_details: Optional[Any] = None  # JSON
     trims_ids: Optional[List[str]] = None  # JSON array
     trims_details: Optional[Any] = None  # JSON
-    decorative_part: Optional[str] = None
+    decorative_part: Optional[List[str]] = None  # List of decorative elements
     decorative_details: Optional[str] = None
 
     # Dates
@@ -407,9 +421,10 @@ class SampleRequestBase(BaseModel):
     # Sample details
     request_pcs: Optional[int] = None
     sample_category: Optional[str] = None
+    priority: Optional[str] = 'normal'  # Priority: urgent, high, normal, low
     color_name: Optional[str] = None
     size_name: Optional[str] = None
-    additional_instruction: Optional[str] = None
+    additional_instruction: Optional[List[str]] = None  # List of instructions
 
     # Attachments
     techpack_url: Optional[str] = None
@@ -422,6 +437,36 @@ class SampleRequestBase(BaseModel):
 
 class SampleRequestCreate(SampleRequestBase):
     sample_id: Optional[str] = None  # Can be auto-generated
+    
+    @field_validator('ply', mode='before')
+    @classmethod
+    def convert_ply_to_string(cls, v):
+        """Convert ply to string if it's a number"""
+        if v is None or v == '':
+            return None
+        return str(v)
+    
+    @field_validator('decorative_part', mode='before')
+    @classmethod
+    def normalize_decorative_part(cls, v):
+        """Convert decorative_part to list if it's a string"""
+        if v is None or v == '':
+            return None
+        if isinstance(v, str):
+            items = [item.strip() for item in v.split(',') if item.strip()]
+            return items if items else None
+        return v
+    
+    @field_validator('additional_instruction', mode='before')
+    @classmethod
+    def normalize_additional_instruction(cls, v):
+        """Convert additional_instruction to list if it's a string"""
+        if v is None or v == '':
+            return None
+        if isinstance(v, str):
+            lines = [line.strip() for line in v.split('\n') if line.strip()]
+            return lines if lines else None
+        return v
 
 
 class SampleRequestUpdate(BaseModel):
@@ -430,22 +475,23 @@ class SampleRequestUpdate(BaseModel):
     sample_name: Optional[str] = None
     style_id: Optional[int] = None
     gauge: Optional[str] = None
-    ply: Optional[int] = None
+    ply: Optional[str] = None
     item: Optional[str] = None
     yarn_id: Optional[str] = None
     yarn_details: Optional[Any] = None
     trims_ids: Optional[List[str]] = None
     trims_details: Optional[Any] = None
-    decorative_part: Optional[str] = None
+    decorative_part: Optional[List[str]] = None  # List of decorative elements
     decorative_details: Optional[str] = None
     yarn_handover_date: Optional[datetime] = None
     trims_handover_date: Optional[datetime] = None
     required_date: Optional[datetime] = None
     request_pcs: Optional[int] = None
     sample_category: Optional[str] = None
+    priority: Optional[str] = None  # Priority: urgent, high, normal, low
     color_name: Optional[str] = None
     size_name: Optional[str] = None
-    additional_instruction: Optional[str] = None
+    additional_instruction: Optional[List[str]] = None  # List of instructions
     techpack_url: Optional[str] = None
     techpack_filename: Optional[str] = None
     round: Optional[int] = None
@@ -484,14 +530,14 @@ class StyleVariantMaterialBase(BaseModel):
     product_id: Optional[str] = None
     product_name: Optional[str] = None
     required_quantity: Optional[float] = None
-    uom: Optional[str] = None
     weight: Optional[float] = None
-    weight_uom: str = "kg"
     condition: Optional[str] = None
 
 
 class StyleVariantMaterialCreate(StyleVariantMaterialBase):
     style_variant_id: int
+    unit_id: Optional[int] = Field(None, gt=0, description="Reference to unit in db-units for quantity")
+    weight_unit_id: Optional[int] = Field(None, gt=0, description="Reference to unit in db-units for weight")
 
 
 class StyleVariantMaterialUpdate(BaseModel):
@@ -501,15 +547,19 @@ class StyleVariantMaterialUpdate(BaseModel):
     product_id: Optional[str] = None
     product_name: Optional[str] = None
     required_quantity: Optional[float] = None
-    uom: Optional[str] = None
+    unit_id: Optional[int] = Field(None, gt=0, description="Reference to unit in db-units for quantity")
     weight: Optional[float] = None
-    weight_uom: Optional[str] = None
+    weight_unit_id: Optional[int] = Field(None, gt=0, description="Reference to unit in db-units for weight")
     condition: Optional[str] = None
 
 
 class StyleVariantMaterialResponse(StyleVariantMaterialBase):
     id: int
     style_variant_id: int
+    unit_id: Optional[int] = None
+    unit: Optional[UnitInfo] = Field(None, description="Unit details for quantity populated from db-units")
+    weight_unit_id: Optional[int] = None
+    weight_unit: Optional[UnitInfo] = Field(None, description="Unit details for weight populated from db-units")
     created_at: datetime
     updated_at: Optional[datetime] = None
 

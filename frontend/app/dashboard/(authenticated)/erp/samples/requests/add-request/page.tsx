@@ -188,7 +188,7 @@ export default function AddSampleRequestPage() {
     sample_name: "",
     item: "",
     gauge: "",
-    ply: "",
+    ply: "" as string | number,
     sample_category: "Proto",
     priority: "normal" as string,
     yarn_id: "",
@@ -424,7 +424,7 @@ export default function AddSampleRequestPage() {
       sample_name: formData.sample_name,
       item: formData.item || null,
       gauge: formData.gauge ? formatGaugeForStorage(formData.gauge) : null,
-      ply: formData.ply ? parseInt(formData.ply) : null,
+      ply: formData.ply ? parseInt(String(formData.ply)) : null,
       sample_category: formData.sample_category,
       // Note: priority is not in SampleRequest model, it's only in Merchandiser's SamplePrimaryInfo
       yarn_id: formData.yarn_id || null,

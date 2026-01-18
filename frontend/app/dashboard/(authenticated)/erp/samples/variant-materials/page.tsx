@@ -14,6 +14,10 @@ import { PlusCircle, Edit, Trash2, Search, X, Check, ChevronsUpDown } from "luci
 import { samplesService, api } from "@/services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { UnitSelector } from "@/components/uom/UnitSelector";
+import { InlineConverter } from "@/components/uom/InlineConverter";
+import { UnitDisplay } from "@/components/uom/UnitDisplay";
+import { useUnits, useUnitSearch } from "@/hooks/use-units";
 
 export default function StyleVariantMaterialsPage() {
   const [materials, setMaterials] = useState<any[]>([]);
@@ -38,8 +42,9 @@ export default function StyleVariantMaterialsPage() {
     product_id: "",
     product_name: "",
     required_quantity: "",
-    uom: "",
+    unit_id: null as number | null,
     weight: "",
+    weight_unit_id: null as number | null,
   });
 
   useEffect(() => {
@@ -120,7 +125,7 @@ export default function StyleVariantMaterialsPage() {
         product_name: product.material_name || "",
         product_category: product.category || "",
         sub_category: product.sub_category || "",
-        uom: product.uom || "",
+        unit_id: product.unit_id || null, // Use unit_id from product if available
         weight: autoWeight,
       });
     }
@@ -139,6 +144,23 @@ export default function StyleVariantMaterialsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.style_variant_id) {
+      toast.error("Please select a style variant");
+      return;
+    }
+    
+    if (!formData.required_quantity) {
+      toast.error("Please enter required quantity");
+      return;
+    }
+    
+    if (!formData.unit_id) {
+      toast.error("Please select a unit for quantity");
+      return;
+    }
+    
     try {
       const data = {
         style_variant_id: parseInt(formData.style_variant_id),
@@ -148,8 +170,9 @@ export default function StyleVariantMaterialsPage() {
         product_id: formData.product_id || null,
         product_name: formData.product_name || null,
         required_quantity: formData.required_quantity ? parseFloat(formData.required_quantity) : null,
-        uom: formData.uom || null,
+        unit_id: formData.unit_id,
         weight: formData.weight ? parseFloat(formData.weight) : null,
+        weight_unit_id: formData.weight_unit_id,
       };
 
       if (editingItem) {
@@ -178,8 +201,9 @@ export default function StyleVariantMaterialsPage() {
       product_id: item.product_id || "",
       product_name: item.product_name || "",
       required_quantity: item.required_quantity?.toString() || "",
-      uom: item.uom || "",
+      unit_id: item.unit_id || null,
       weight: item.weight?.toString() || "",
+      weight_unit_id: item.weight_unit_id || null,
     });
     setIsDialogOpen(true);
   };
@@ -201,7 +225,7 @@ export default function StyleVariantMaterialsPage() {
     setFormData({
       style_variant_id: "", style_material_id: "", product_category: "",
       sub_category: "", product_id: "", product_name: "",
-      required_quantity: "", uom: "", weight: "",
+      required_quantity: "", unit_id: null, weight: "", weight_unit_id: null,
     });
     setVariantSearch("");
     setProductSearch("");
@@ -312,8 +336,8 @@ export default function StyleVariantMaterialsPage() {
                 </div>
               </div>
 
-              {/* Quantity, UOM, Weight */}
-              <div className="grid grid-cols-3 gap-4">
+              {/* Quantity, Unit, Weight */}
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Required Quantity *</Label>
                   <Input
@@ -326,17 +350,54 @@ export default function StyleVariantMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>UoM</Label>
-                  <Input value={formData.uom} disabled className="bg-muted" />
+                  <Label>Unit *</Label>
+                  <div className="flex items-center gap-2">
+                    <UnitSelector
+                      value={formData.unit_id || undefined}
+                      onChange={(unitId) => setFormData({ ...formData, unit_id: unitId })}
+                      categoryFilter={formData.product_category || undefined}
+                      placeholder="Select unit..."
+                      className="flex-1"
+                    />
+                    {formData.required_quantity && formData.unit_id && (
+                      <InlineConverter
+                        value={parseFloat(formData.required_quantity)}
+                        fromUnitId={formData.unit_id}
+                        categoryName={formData.product_category || undefined}
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Weight (Auto Calculated)</Label>
                   <Input
+                    type="number"
+                    step="0.001"
+                    min="0"
                     value={formData.weight}
-                    disabled
-                    className="bg-muted font-medium"
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                    className="font-medium"
                     placeholder="Auto-calculated"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Weight Unit</Label>
+                  <div className="flex items-center gap-2">
+                    <UnitSelector
+                      value={formData.weight_unit_id || undefined}
+                      onChange={(unitId) => setFormData({ ...formData, weight_unit_id: unitId })}
+                      categoryFilter="Weight"
+                      placeholder="Select weight unit..."
+                      className="flex-1"
+                    />
+                    {formData.weight && formData.weight_unit_id && (
+                      <InlineConverter
+                        value={parseFloat(formData.weight)}
+                        fromUnitId={formData.weight_unit_id}
+                        categoryName="Weight"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -376,8 +437,7 @@ export default function StyleVariantMaterialsPage() {
               <TableHead>Sub-Category</TableHead>
               <TableHead>Product ID</TableHead>
               <TableHead>Product Name</TableHead>
-              <TableHead>Qty</TableHead>
-              <TableHead>UoM</TableHead>
+              <TableHead>Quantity</TableHead>
               <TableHead>Weight</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -385,7 +445,7 @@ export default function StyleVariantMaterialsPage() {
           <TableBody>
             {filteredMaterials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   {loading ? "Loading..." : "No materials found"}
                 </TableCell>
               </TableRow>
@@ -400,9 +460,26 @@ export default function StyleVariantMaterialsPage() {
                     <TableCell>{item.sub_category || "-"}</TableCell>
                     <TableCell className="font-mono">{item.product_id || "-"}</TableCell>
                     <TableCell>{item.product_name || "-"}</TableCell>
-                    <TableCell>{item.required_quantity || "-"}</TableCell>
-                    <TableCell>{item.uom || "-"}</TableCell>
-                    <TableCell className="font-medium">{item.weight || "-"}</TableCell>
+                    <TableCell>
+                      {item.required_quantity ? (
+                        <div className="flex items-center gap-1">
+                          <span>{item.required_quantity}</span>
+                          {item.unit_id && (
+                            <UnitDisplay unitId={item.unit_id} />
+                          )}
+                        </div>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {item.weight ? (
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">{item.weight}</span>
+                          {item.weight_unit_id && (
+                            <UnitDisplay unitId={item.weight_unit_id} />
+                          )}
+                        </div>
+                      ) : "-"}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
                         <Edit className="h-4 w-4" />

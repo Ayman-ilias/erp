@@ -238,6 +238,7 @@ class SamplePrimaryInfo(Base):
     
     # Sample details
     request_pcs = Column(Integer, nullable=True)  # Number of pieces requested
+    priority = Column(String(20), default='normal')  # Priority: urgent, high, normal, low
     # Multiple additional instructions with status: [{instruction: string, done: boolean}, ...]
     additional_instruction = Column(JSON, nullable=True)
     

@@ -2492,6 +2492,51 @@ export const settingsService = {
     },
   },
 
+  // Companies (Multi-Company Support)
+  companies: {
+    getAll: async (token: string, limit?: number) => {
+      const basePath = getBasePath();
+      const params = limit ? `?limit=${limit}` : "";
+      return getAPIResponse(basePath, `/settings/companies${params}`, token, "GET");
+    },
+    getById: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/settings/companies/${id}`, token, "GET");
+    },
+    create: async (data: any, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, "/settings/companies", token, "POST", JSON.stringify(data));
+    },
+    update: async (id: number, data: any, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/settings/companies/${id}`, token, "PUT", JSON.stringify(data));
+    },
+    delete: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/settings/companies/${id}`, token, "DELETE");
+    },
+    uploadLogo: async (id: number, file: File, token: string) => {
+      const basePath = getBasePath();
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`${basePath}/settings/companies/${id}/upload-logo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to upload logo');
+      }
+      
+      return await response.json();
+    },
+  },
+
   // Branches
   branches: {
     getAll: async (token: string, limit?: number) => {
@@ -3398,5 +3443,450 @@ export const sizeChartService = {
   delete: async (id: number) => {
     const basePath = getBasePath();
     return getAPIResponse(basePath, `/size-charts/${id}`, null, "DELETE");
+  },
+};
+
+// ============================================================================
+// UNIT CONVERSION SYSTEM SERVICE
+// ============================================================================
+
+export const unitService = {
+  // Categories
+  categories: {
+    getAll: async (token: string, isActive?: boolean) => {
+      const basePath = getBasePath();
+      const query = isActive !== undefined ? `?is_active=${isActive}` : "";
+      return getAPIResponse(basePath, `/units/categories${query}`, token, "GET");
+    },
+
+    getAllWithCounts: async (token: string, isActive?: boolean) => {
+      const basePath = getBasePath();
+      const query = isActive !== undefined ? `?is_active=${isActive}` : "";
+      return getAPIResponse(basePath, `/units/categories/with-counts${query}`, token, "GET");
+    },
+
+    getById: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/units/categories/${id}`, token, "GET");
+    },
+
+    create: async (data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/units/categories`, token, "POST", JSON.stringify(data));
+    },
+
+    update: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/units/categories/${id}`, token, "PUT", JSON.stringify(data));
+    },
+
+    delete: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/units/categories/${id}`, token, "DELETE");
+    },
+  },
+
+  // Units
+  getAll: async (token: string, categoryId?: number, unitType?: string, search?: string, limit?: number) => {
+    const basePath = getBasePath();
+    const params = new URLSearchParams();
+    if (categoryId) params.append("category_id", String(categoryId));
+    if (unitType) params.append("unit_type", unitType);
+    if (search) params.append("search", search);
+    if (limit) params.append("limit", String(limit));
+    const queryString = params.toString();
+    return getAPIResponse(basePath, `/units${queryString ? `?${queryString}` : ""}`, token, "GET");
+  },
+
+  getForSelector: async (token: string, categoryId?: number, categoryName?: string) => {
+    const basePath = getBasePath();
+    const params = new URLSearchParams();
+    if (categoryId) params.append("category_id", String(categoryId));
+    if (categoryName) params.append("category_name", categoryName);
+    const queryString = params.toString();
+    return getAPIResponse(basePath, `/units/for-selector${queryString ? `?${queryString}` : ""}`, token, "GET");
+  },
+
+  search: async (query: string, token: string, categoryId?: number, limit?: number) => {
+    const basePath = getBasePath();
+    const params = new URLSearchParams({ q: query });
+    if (categoryId) params.append("category_id", String(categoryId));
+    if (limit) params.append("limit", String(limit));
+    return getAPIResponse(basePath, `/units/search?${params.toString()}`, token, "GET");
+  },
+
+  getById: async (id: number, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/${id}`, token, "GET");
+  },
+
+  create: async (data: Record<string, any>, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units`, token, "POST", JSON.stringify(data));
+  },
+
+  update: async (id: number, data: Record<string, any>, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/${id}`, token, "PUT", JSON.stringify(data));
+  },
+
+  delete: async (id: number, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/${id}`, token, "DELETE");
+  },
+
+  // Conversion
+  convert: async (data: { value: number; from_unit_symbol: string; to_unit_symbol: string }, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/convert`, token, "POST", JSON.stringify(data));
+  },
+
+  batchConvert: async (data: { conversions: Array<{ value: number; from_unit: string; to_unit: string }> }, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/convert/batch`, token, "POST", JSON.stringify(data));
+  },
+
+  getCompatible: async (unitId: number, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/compatible/${unitId}`, token, "GET");
+  },
+
+  validateSymbol: async (data: { symbol: string; category_id: number; exclude_id?: number }, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/units/validate-symbol`, token, "POST", JSON.stringify(data));
+  },
+};
+
+// ============================================================================
+// SIZE & COLOR MASTER SERVICE (Redesigned Schema)
+// ============================================================================
+// Two separate color systems:
+// - Universal Colors: Pantone/TCX/RGB/Hex codes for industry standards
+// - H&M Colors: H&M proprietary 5-digit codes (XX-XXX format)
+// Size system with garment-type-based measurement specifications
+// ============================================================================
+
+export const sizeColorService = {
+  // ============================================================================
+  // UNIVERSAL COLORS (Pantone/TCX/RGB/Hex)
+  // ============================================================================
+  universalColors: {
+    getAll: async (token: string, colorFamily?: string, colorType?: string, skip?: number, limit?: number) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (colorFamily) params.append("color_family", colorFamily);
+      if (colorType) params.append("color_type", colorType);
+      if (skip !== undefined) params.append("skip", String(skip));
+      if (limit !== undefined) params.append("limit", String(limit));
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getForSelector: async (token: string, colorFamily?: string) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (colorFamily) params.append("color_family", colorFamily);
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal/for-selector${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getById: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal/${id}`, token, "GET");
+    },
+
+    getByCode: async (code: string, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal/by-code/${encodeURIComponent(code)}`, token, "GET");
+    },
+
+    create: async (data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal`, token, "POST", JSON.stringify(data));
+    },
+
+    update: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal/${id}`, token, "PUT", JSON.stringify(data));
+    },
+
+    delete: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/universal/${id}`, token, "DELETE");
+    },
+  },
+
+  // ============================================================================
+  // H&M COLORS (Proprietary 5-digit codes XX-XXX)
+  // ============================================================================
+  hmColors: {
+    // H&M Color Groups (01-09 Achromatic, 10-19 Red, etc.)
+    getGroups: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/groups`, token, "GET");
+    },
+
+    createGroup: async (data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/groups`, token, "POST", JSON.stringify(data));
+    },
+
+    // H&M Colors
+    getAll: async (token: string, groupId?: number, skip?: number, limit?: number) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (groupId) params.append("group_id", String(groupId));
+      if (skip !== undefined) params.append("skip", String(skip));
+      if (limit !== undefined) params.append("limit", String(limit));
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getForSelector: async (token: string, groupId?: number) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (groupId) params.append("group_id", String(groupId));
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/for-selector${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getById: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/${id}`, token, "GET");
+    },
+
+    getByCode: async (hmCode: string, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/by-code/${encodeURIComponent(hmCode)}`, token, "GET");
+    },
+
+    create: async (data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm`, token, "POST", JSON.stringify(data));
+    },
+
+    update: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/${id}`, token, "PUT", JSON.stringify(data));
+    },
+
+    delete: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/${id}`, token, "DELETE");
+    },
+  },
+
+  // ============================================================================
+  // GARMENT TYPES (with measurement specs)
+  // ============================================================================
+  garmentTypes: {
+    getAll: async (token: string, skip?: number, limit?: number) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (skip !== undefined) params.append("skip", String(skip));
+      if (limit !== undefined) params.append("limit", String(limit));
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/garment-types${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getForSelector: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/garment-types/for-selector`, token, "GET");
+    },
+
+    getById: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/garment-types/${id}`, token, "GET");
+    },
+
+    getMeasurements: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/garment-types/${id}/measurements`, token, "GET");
+    },
+
+    create: async (data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/garment-types`, token, "POST", JSON.stringify(data));
+    },
+
+    update: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/garment-types/${id}`, token, "PUT", JSON.stringify(data));
+    },
+
+    addMeasurement: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/garment-types/${id}/measurements`, token, "POST", JSON.stringify(data));
+    },
+  },
+
+  // ============================================================================
+  // SIZES (linked to garment types)
+  // ============================================================================
+  sizes: {
+    getAll: async (token: string, garmentTypeId?: number, gender?: string, ageGroup?: string, fitType?: string, skip?: number, limit?: number) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (garmentTypeId) params.append("garment_type_id", String(garmentTypeId));
+      if (gender) params.append("gender", gender);
+      if (ageGroup) params.append("age_group", ageGroup);
+      if (fitType) params.append("fit_type", fitType);
+      if (skip !== undefined) params.append("skip", String(skip));
+      if (limit !== undefined) params.append("limit", String(limit));
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/sizes${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getForSelector: async (token: string, garmentTypeId?: number, gender?: string, ageGroup?: string, fitType?: string) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      if (garmentTypeId) params.append("garment_type_id", String(garmentTypeId));
+      if (gender) params.append("gender", gender);
+      if (ageGroup) params.append("age_group", ageGroup);
+      if (fitType) params.append("fit_type", fitType);
+      const queryString = params.toString();
+      return getAPIResponse(basePath, `/sizecolor/sizes/for-selector${queryString ? `?${queryString}` : ""}`, token, "GET");
+    },
+
+    getById: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sizes/${id}`, token, "GET");
+    },
+
+    create: async (data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sizes`, token, "POST", JSON.stringify(data));
+    },
+
+    update: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sizes/${id}`, token, "PUT", JSON.stringify(data));
+    },
+
+    delete: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sizes/${id}`, token, "DELETE");
+    },
+
+    // Size Measurements
+    addMeasurement: async (sizeId: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sizes/${sizeId}/measurements`, token, "POST", JSON.stringify(data));
+    },
+  },
+
+  // ============================================================================
+  // SIZE MEASUREMENTS (individual measurement CRUD)
+  // ============================================================================
+  measurements: {
+    update: async (id: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/measurements/${id}`, token, "PUT", JSON.stringify(data));
+    },
+
+    delete: async (id: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/measurements/${id}`, token, "DELETE");
+    },
+  },
+
+  // ============================================================================
+  // SAMPLE SELECTIONS (colors/sizes assigned to samples)
+  // ============================================================================
+  sampleColors: {
+    get: async (sampleId: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sample/${sampleId}/colors`, token, "GET");
+    },
+
+    add: async (sampleId: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sample/${sampleId}/colors`, token, "POST", JSON.stringify(data));
+    },
+
+    delete: async (selectionId: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sample/colors/${selectionId}`, token, "DELETE");
+    },
+  },
+
+  sampleSizes: {
+    get: async (sampleId: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sample/${sampleId}/sizes`, token, "GET");
+    },
+
+    add: async (sampleId: number, data: Record<string, any>, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sample/${sampleId}/sizes`, token, "POST", JSON.stringify(data));
+    },
+
+    delete: async (selectionId: number, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/sample/sizes/${selectionId}`, token, "DELETE");
+    },
+  },
+
+  // ============================================================================
+  // SUGGESTIONS (buyer usage patterns)
+  // ============================================================================
+  getSuggestions: async (buyerId: number, token: string) => {
+    const basePath = getBasePath();
+    return getAPIResponse(basePath, `/sizecolor/suggestions/${buyerId}`, token, "GET");
+  },
+
+  // ============================================================================
+  // USAGE TRACKING
+  // ============================================================================
+  usage: {
+    recordColor: async (data: { buyer_id: number; universal_color_id?: number; hm_color_id?: number }, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/usage/color`, token, "POST", JSON.stringify(data));
+    },
+
+    recordSize: async (data: { buyer_id: number; size_id: number }, token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/usage/size`, token, "POST", JSON.stringify(data));
+    },
+  },
+
+  // ============================================================================
+  // OPTIONS (enum values from backend)
+  // ============================================================================
+  options: {
+    getColorFamilies: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/color-families`, token, "GET");
+    },
+
+    getColorTypes: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/color-types`, token, "GET");
+    },
+
+    getColorValues: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/color-values`, token, "GET");
+    },
+
+    getFinishTypes: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/finish-types`, token, "GET");
+    },
+
+    getGenders: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/genders`, token, "GET");
+    },
+
+    getFitTypes: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/fit-types`, token, "GET");
+    },
+
+    getAgeGroups: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/options/age-groups`, token, "GET");
+    },
   },
 };

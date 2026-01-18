@@ -512,6 +512,124 @@ export const PATHS = {
     MARK_READ: (id: number) => ({ root: `/notifications/${id}/read` as const }),
     MARK_ALL_READ: () => ({ root: "/notifications/mark-all-read" as const }),
   } as const,
+
+  // Unit Conversion System
+  UNITS: {
+    // Categories
+    CATEGORIES: {
+      LIST: (isActive?: boolean) => ({
+        root: `/units/categories${isActive !== undefined ? `?is_active=${isActive}` : ""}` as const,
+      }),
+      WITH_COUNTS: (isActive?: boolean) => ({
+        root: `/units/categories/with-counts${isActive !== undefined ? `?is_active=${isActive}` : ""}` as const,
+      }),
+      DETAIL: (id: number) => ({ root: `/units/categories/${id}` as const }),
+      CREATE: () => ({ root: "/units/categories" as const }),
+      UPDATE: (id: number) => ({ root: `/units/categories/${id}` as const }),
+      DELETE: (id: number) => ({ root: `/units/categories/${id}` as const }),
+    } as const,
+    // Units
+    LIST: (categoryId?: number, unitType?: string, search?: string, limit?: number) => {
+      const params = new URLSearchParams();
+      if (categoryId) params.append("category_id", String(categoryId));
+      if (unitType) params.append("unit_type", unitType);
+      if (search) params.append("search", search);
+      if (limit) params.append("limit", String(limit));
+      const queryString = params.toString();
+      return { root: `/units${queryString ? `?${queryString}` : ""}` as const };
+    },
+    FOR_SELECTOR: (categoryId?: number, categoryName?: string) => {
+      const params = new URLSearchParams();
+      if (categoryId) params.append("category_id", String(categoryId));
+      if (categoryName) params.append("category_name", categoryName);
+      return { root: `/units/for-selector${params.toString() ? `?${params.toString()}` : ""}` as const };
+    },
+    SEARCH: (query: string, categoryId?: number, limit?: number) => {
+      const params = new URLSearchParams({ q: query });
+      if (categoryId) params.append("category_id", String(categoryId));
+      if (limit) params.append("limit", String(limit));
+      return { root: `/units/search?${params.toString()}` as const };
+    },
+    DETAIL: (id: number) => ({ root: `/units/${id}` as const }),
+    CREATE: () => ({ root: "/units" as const }),
+    UPDATE: (id: number) => ({ root: `/units/${id}` as const }),
+    DELETE: (id: number) => ({ root: `/units/${id}` as const }),
+    // Conversion
+    CONVERT: () => ({ root: "/units/convert" as const }),
+    BATCH_CONVERT: () => ({ root: "/units/convert/batch" as const }),
+    COMPATIBLE: (unitId: number) => ({ root: `/units/compatible/${unitId}` as const }),
+    VALIDATE_SYMBOL: () => ({ root: "/units/validate-symbol" as const }),
+  } as const,
+
+  // Size & Color Master System
+  SIZECOLOR: {
+    // Sizes
+    SIZES: {
+      LIST: (garmentType?: string, gender?: string, skip?: number, limit?: number) => {
+        const params = new URLSearchParams();
+        if (garmentType) params.append("garment_type", garmentType);
+        if (gender) params.append("gender", gender);
+        if (skip !== undefined) params.append("skip", String(skip));
+        if (limit !== undefined) params.append("limit", String(limit));
+        const queryString = params.toString();
+        return { root: `/sizecolor/sizes${queryString ? `?${queryString}` : ""}` as const };
+      },
+      FOR_SELECTOR: (garmentType?: string, gender?: string) => {
+        const params = new URLSearchParams();
+        if (garmentType) params.append("garment_type", garmentType);
+        if (gender) params.append("gender", gender);
+        return { root: `/sizecolor/sizes/for-selector${params.toString() ? `?${params.toString()}` : ""}` as const };
+      },
+      DETAIL: (id: number) => ({ root: `/sizecolor/sizes/${id}` as const }),
+      CREATE: () => ({ root: "/sizecolor/sizes" as const }),
+      UPDATE: (id: number) => ({ root: `/sizecolor/sizes/${id}` as const }),
+      DELETE: (id: number) => ({ root: `/sizecolor/sizes/${id}` as const }),
+      MEASUREMENTS: (sizeId: number) => ({ root: `/sizecolor/sizes/${sizeId}/measurements` as const }),
+      ADD_MEASUREMENT: (sizeId: number) => ({ root: `/sizecolor/sizes/${sizeId}/measurements` as const }),
+    } as const,
+    // Colors
+    COLORS: {
+      LIST: (colorFamily?: string, colorType?: string, skip?: number, limit?: number) => {
+        const params = new URLSearchParams();
+        if (colorFamily) params.append("color_family", colorFamily);
+        if (colorType) params.append("color_type", colorType);
+        if (skip !== undefined) params.append("skip", String(skip));
+        if (limit !== undefined) params.append("limit", String(limit));
+        const queryString = params.toString();
+        return { root: `/sizecolor/colors${queryString ? `?${queryString}` : ""}` as const };
+      },
+      FOR_SELECTOR: (colorFamily?: string) => {
+        const params = new URLSearchParams();
+        if (colorFamily) params.append("color_family", colorFamily);
+        return { root: `/sizecolor/colors/for-selector${params.toString() ? `?${params.toString()}` : ""}` as const };
+      },
+      DETAIL: (id: number) => ({ root: `/sizecolor/colors/${id}` as const }),
+      CREATE: () => ({ root: "/sizecolor/colors" as const }),
+      UPDATE: (id: number) => ({ root: `/sizecolor/colors/${id}` as const }),
+      DELETE: (id: number) => ({ root: `/sizecolor/colors/${id}` as const }),
+      HM_CODES: (colorId: number) => ({ root: `/sizecolor/colors/${colorId}/hm-codes` as const }),
+      ADD_HM_CODE: (colorId: number) => ({ root: `/sizecolor/colors/${colorId}/hm-codes` as const }),
+      TCX_CODES: (colorId: number) => ({ root: `/sizecolor/colors/${colorId}/tcx-codes` as const }),
+      ADD_TCX_CODE: (colorId: number) => ({ root: `/sizecolor/colors/${colorId}/tcx-codes` as const }),
+    } as const,
+    // Suggestions
+    SUGGESTIONS: (buyerId: number) => ({ root: `/sizecolor/suggestions/${buyerId}` as const }),
+    // Usage tracking
+    USAGE: {
+      SIZE: () => ({ root: "/sizecolor/usage/size" as const }),
+      COLOR: () => ({ root: "/sizecolor/usage/color" as const }),
+    } as const,
+    // Options (enums)
+    OPTIONS: {
+      GARMENT_TYPES: () => ({ root: "/sizecolor/options/garment-types" as const }),
+      GENDERS: () => ({ root: "/sizecolor/options/genders" as const }),
+      FIT_TYPES: () => ({ root: "/sizecolor/options/fit-types" as const }),
+      COLOR_FAMILIES: () => ({ root: "/sizecolor/options/color-families" as const }),
+      COLOR_TYPES: () => ({ root: "/sizecolor/options/color-types" as const }),
+      COLOR_VALUES: () => ({ root: "/sizecolor/options/color-values" as const }),
+      FINISH_TYPES: () => ({ root: "/sizecolor/options/finish-types" as const }),
+    } as const,
+  } as const,
 } as const;
 
 // ============================================================================

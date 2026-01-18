@@ -92,6 +92,24 @@ async def startup_event():
         from migrations.add_performance_indexes import add_performance_indexes
         add_performance_indexes()
         
+        # Settings module improvements migrations
+        from migrations.add_multi_company_support import run_migration as add_multi_company
+        add_multi_company()
+        
+        from migrations.add_company_id_to_branches import run_migration as add_company_to_branches
+        add_company_to_branches()
+        
+        from migrations.create_country_port_tables import run_migration as create_country_port
+        create_country_port()
+
+        # Seed Unit Conversion System data
+        from migrations.seed_unit_conversion_system import seed_unit_conversion_system
+        seed_unit_conversion_system()
+
+        # Seed Size & Color Master data
+        from migrations.seed_sizecolor_data import seed_sizecolor_data
+        seed_sizecolor_data()
+
         logger.info("Migrations completed successfully")
     except ImportError as e:
         logger.warning(f"Could not import migration (may be expected): {str(e)}")
@@ -131,6 +149,8 @@ from modules.merchandiser import merchandiser_router
 from modules.settings import settings_router
 from modules.notifications import router as notifications_router
 from modules.workflows import workflow_router
+from modules.units.routes import router as units_router
+from modules.sizecolor.routes import sizecolor_router
 
 # Register routers
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
@@ -152,6 +172,8 @@ app.include_router(merchandiser_router, prefix=f"{settings.API_V1_STR}/merchandi
 app.include_router(settings_router, prefix=f"{settings.API_V1_STR}/settings", tags=["settings"])
 app.include_router(notifications_router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
 app.include_router(workflow_router, prefix=f"{settings.API_V1_STR}", tags=["workflows"])
+app.include_router(units_router, prefix=f"{settings.API_V1_STR}", tags=["unit-conversion"])
+app.include_router(sizecolor_router, prefix=f"{settings.API_V1_STR}/sizecolor", tags=["size-color-master"])
 
 # Mount static files for uploaded content (logos, attachments, etc.)
 # Create uploads directory if it doesn't exist

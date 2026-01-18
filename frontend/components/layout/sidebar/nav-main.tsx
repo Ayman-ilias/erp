@@ -31,7 +31,6 @@ import {
   PackageIcon,
   PaletteIcon,
   BoxIcon,
-  FileTextIcon,
   ShieldIcon,
   GlobeIcon,
   CircleDollarSignIcon,
@@ -44,9 +43,10 @@ import {
   ClockIcon,
   BookOpenIcon,
   MapPinIcon,
-  CogIcon,
   WrenchIcon,
-  ClipboardListIcon
+  ClipboardListIcon,
+  SwatchBookIcon,
+  Maximize2Icon
 } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -164,11 +164,6 @@ export const navItems: NavGroup[] = [
             icon: PackageIcon
           },
           {
-            title: "Size Details",
-            href: "/dashboard/erp/merchandising/size-details",
-            icon: FileTextIcon
-          },
-          {
             title: "Sample Development",
             href: "/dashboard/erp/merchandising/sample-development",
             icon: ClipboardCheckIcon
@@ -254,14 +249,19 @@ export const navItems: NavGroup[] = [
             icon: NetworkIcon
           },
           {
-            title: "Units of Measure",
-            href: "/dashboard/erp/settings/uom",
+            title: "Unit Conversion",
+            href: "/dashboard/erp/settings/unit-conversion",
             icon: RulerIcon
           },
           {
-            title: "Colour Master",
-            href: "/dashboard/erp/settings/colors",
-            icon: PaletteIcon
+            title: "Size Master",
+            href: "/dashboard/erp/settings/size-master",
+            icon: Maximize2Icon
+          },
+          {
+            title: "Color Master",
+            href: "/dashboard/erp/settings/color-master",
+            icon: SwatchBookIcon
           },
           {
             title: "Warehouses",

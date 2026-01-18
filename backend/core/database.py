@@ -20,6 +20,8 @@ class DatabaseType(Enum):
     ORDERS = "orders"
     MERCHANDISER = "merchandiser"
     SETTINGS = "settings"
+    UNITS = "units"
+    SIZECOLOR = "sizecolor"
 
 
 # Connection pool settings (optimized for multi-database setup)
@@ -44,6 +46,8 @@ engines = {
     DatabaseType.ORDERS: create_engine(settings.DATABASE_URL_ORDERS, **POOL_SETTINGS),
     DatabaseType.MERCHANDISER: create_engine(settings.DATABASE_URL_MERCHANDISER, **POOL_SETTINGS),
     DatabaseType.SETTINGS: create_engine(settings.DATABASE_URL_SETTINGS, **POOL_SETTINGS),
+    DatabaseType.UNITS: create_engine(settings.DATABASE_URL_UNITS, **POOL_SETTINGS),
+    DatabaseType.SIZECOLOR: create_engine(settings.DATABASE_URL_SIZECOLOR, **POOL_SETTINGS),
 }
 
 # Create SessionLocal classes for each database
@@ -53,6 +57,8 @@ SessionLocalUsers = sessionmaker(autocommit=False, autoflush=False, bind=engines
 SessionLocalOrders = sessionmaker(autocommit=False, autoflush=False, bind=engines[DatabaseType.ORDERS])
 SessionLocalMerchandiser = sessionmaker(autocommit=False, autoflush=False, bind=engines[DatabaseType.MERCHANDISER])
 SessionLocalSettings = sessionmaker(autocommit=False, autoflush=False, bind=engines[DatabaseType.SETTINGS])
+SessionLocalUnits = sessionmaker(autocommit=False, autoflush=False, bind=engines[DatabaseType.UNITS])
+SessionLocalSizeColor = sessionmaker(autocommit=False, autoflush=False, bind=engines[DatabaseType.SIZECOLOR])
 
 # Create separate Base classes for each database
 BaseClients = declarative_base()
@@ -61,6 +67,8 @@ BaseUsers = declarative_base()
 BaseOrders = declarative_base()
 BaseMerchandiser = declarative_base()
 BaseSettings = declarative_base()
+BaseUnits = declarative_base()
+BaseSizeColor = declarative_base()
 
 # Legacy aliases for backward compatibility
 engine = engines[DatabaseType.SAMPLES]
@@ -132,6 +140,24 @@ def get_db_settings():
         db.close()
 
 
+def get_db_units():
+    """Get database session for units DB (Unit Conversion System)"""
+    db = SessionLocalUnits()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def get_db_sizecolor():
+    """Get database session for sizecolor DB (Size & Color Master System)"""
+    db = SessionLocalSizeColor()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def get_db():
     """Legacy dependency - defaults to samples DB for backward compatibility"""
     db = SessionLocalSamples()
@@ -187,7 +213,28 @@ def init_db():
             Color, Country, Currency, UnitOfMeasure, Tax,
             FiscalYear, DocumentNumbering, PerMinuteValue, Warehouse, Account
         )
-        
+
+        # Import Units models (Unit Conversion System)
+        from modules.units.models.unit import (
+            UnitCategory, Unit, UnitAlias, ConversionHistory
+        )
+
+        # Import SizeColor models (Size & Color Master System - Redesigned)
+        from modules.sizecolor.models.sizecolor import (
+            # Universal Colors (Pantone/TCX/RGB/Hex)
+            UniversalColor,
+            # H&M Colors (proprietary 5-digit codes)
+            HMColorGroup, HMColor,
+            # Garment Types & Measurements
+            GarmentType, GarmentMeasurementSpec,
+            # Size Master
+            SizeMaster, SizeMeasurement,
+            # Sample Selections
+            SampleColorSelection, SampleSizeSelection,
+            # Buyer Usage tracking
+            BuyerColorUsage, BuyerSizeUsage,
+        )
+
         logger.info("All models imported successfully")
     except ImportError as e:
         logger.warning(f"Some models could not be imported: {e}. Tables may not be created.")
@@ -199,6 +246,8 @@ def init_db():
         (DatabaseType.ORDERS, BaseOrders, "Orders"),
         (DatabaseType.MERCHANDISER, BaseMerchandiser, "Merchandiser"),
         (DatabaseType.SETTINGS, BaseSettings, "Settings"),
+        (DatabaseType.UNITS, BaseUnits, "Units"),
+        (DatabaseType.SIZECOLOR, BaseSizeColor, "SizeColor"),
     ]
 
     for db_type, base_class, db_name in databases:

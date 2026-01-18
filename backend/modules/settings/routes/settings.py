@@ -7,6 +7,7 @@ import os
 import uuid
 from core.database import get_db_settings
 from core.logging import setup_logging
+from core.deprecation import warn_legacy_uom_table, log_legacy_model_access
 
 from ..models import (
     CompanyProfile, Branch, Department,
@@ -18,7 +19,7 @@ from ..models import (
     Warehouse, DocumentNumbering, FiscalYear, PerMinuteValue
 )
 from ..schemas import (
-    CompanyProfileUpdate, CompanyProfileResponse,
+    CompanyProfileCreate, CompanyProfileUpdate, CompanyProfileResponse,
     BranchCreate, BranchUpdate, BranchResponse,
     DepartmentCreate, DepartmentUpdate, DepartmentResponse,
     RoleCreate, RoleUpdate, RoleResponse,
@@ -48,26 +49,95 @@ logger = setup_logging()
 router = APIRouter()
 
 
-# ==================== COMPANY PROFILE ====================
+# ==================== COMPANY PROFILE (MULTI-COMPANY) ====================
 
-@router.get("/company-profile", response_model=CompanyProfileResponse)
-def get_company_profile(db: Session = Depends(get_db_settings)):
-    """Get company profile (creates default if not exists)"""
-    profile = db.query(CompanyProfile).first()
-    if not profile:
-        profile = CompanyProfile(company_name="My Company")
-        db.add(profile)
+@router.get("/companies", response_model=List[CompanyProfileResponse])
+def get_companies(
+    skip: int = 0, 
+    limit: Optional[int] = None, 
+    is_active: Optional[bool] = None,
+    db: Session = Depends(get_db_settings)
+):
+    """Get all companies"""
+    query = db.query(CompanyProfile)
+    if is_active is not None:
+        query = query.filter(CompanyProfile.is_active == is_active)
+    return query.order_by(CompanyProfile.company_name).offset(skip).limit(limit).all()
+
+
+@router.get("/companies/{company_id}", response_model=CompanyProfileResponse)
+def get_company(company_id: int, db: Session = Depends(get_db_settings)):
+    """Get a specific company"""
+    company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return company
+
+
+@router.post("/companies", response_model=CompanyProfileResponse, status_code=status.HTTP_201_CREATED)
+def create_company(data: CompanyProfileCreate, db: Session = Depends(get_db_settings)):
+    """Create a new company"""
+    try:
+        company = CompanyProfile(**data.model_dump())
+        db.add(company)
         db.commit()
-        db.refresh(profile)
-    return profile
+        db.refresh(company)
+        return company
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating company: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create company")
 
 
-@router.post("/company-profile/upload-logo", status_code=status.HTTP_200_OK)
+@router.put("/companies/{company_id}", response_model=CompanyProfileResponse)
+def update_company(company_id: int, data: CompanyProfileUpdate, db: Session = Depends(get_db_settings)):
+    """Update a company"""
+    try:
+        company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(company, key, value)
+
+        db.commit()
+        db.refresh(company)
+        return company
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating company: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update company")
+
+
+@router.delete("/companies/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_company(company_id: int, db: Session = Depends(get_db_settings)):
+    """Delete a company"""
+    try:
+        company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        db.delete(company)
+        db.commit()
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting company: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete company")
+
+
+@router.post("/companies/{company_id}/upload-logo", status_code=status.HTTP_200_OK)
 async def upload_company_logo(
+    company_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db_settings)
 ):
-    """Upload company logo - simple approach"""
+    """Upload company logo"""
     # Validate file type
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
@@ -75,6 +145,16 @@ async def upload_company_logo(
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ['.png', '.jpg', '.jpeg']:
         raise HTTPException(status_code=400, detail="Only PNG/JPG allowed")
+    
+    # Check file size (5MB max)
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 5MB")
+    
+    # Get company
+    company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
     
     # Save file
     upload_dir = "uploads/company_logos"
@@ -84,25 +164,19 @@ async def upload_company_logo(
     file_path = os.path.join(upload_dir, filename)
     
     with open(file_path, "wb") as f:
-        content = await file.read()
         f.write(content)
     
     # Update database
-    profile = db.query(CompanyProfile).first()
-    if not profile:
-        profile = CompanyProfile(company_name="My Company")
-        db.add(profile)
-    
-    logo_url = f"/api/v1/settings/company-profile/logo/{filename}"
-    profile.logo_url = logo_url
+    logo_url = f"/api/v1/settings/companies/logo/{filename}"
+    company.logo_url = logo_url
     db.commit()
     
     return {"logo_url": logo_url}
 
 
-@router.get("/company-profile/logo/{filename}")
+@router.get("/companies/logo/{filename}")
 async def get_company_logo(filename: str):
-    """Serve company logo file - simple approach"""
+    """Serve company logo file"""
     file_path = os.path.join("uploads/company_logos", filename)
     
     if not os.path.exists(file_path):
@@ -122,11 +196,50 @@ async def get_company_logo(filename: str):
     )
 
 
+@router.delete("/companies/{company_id}/logo", status_code=status.HTTP_204_NO_CONTENT)
+def delete_company_logo(company_id: int, db: Session = Depends(get_db_settings)):
+    """Remove company logo"""
+    try:
+        company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        
+        # Delete physical file if exists
+        if company.logo_url:
+            filename = company.logo_url.split('/')[-1]
+            file_path = os.path.join("uploads/company_logos", filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        # Clear logo_url in database
+        company.logo_url = None
+        db.commit()
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error removing logo: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove logo")
+
+
+# ==================== LEGACY ENDPOINTS (Backward Compatibility) ====================
+
+@router.get("/company-profile", response_model=CompanyProfileResponse)
+def get_company_profile(db: Session = Depends(get_db_settings)):
+    """Get first company profile (legacy endpoint for backward compatibility)"""
+    profile = db.query(CompanyProfile).first()
+    if not profile:
+        profile = CompanyProfile(company_name="My Company")
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return profile
 
 
 @router.put("/company-profile", response_model=CompanyProfileResponse)
 def update_company_profile(data: CompanyProfileUpdate, db: Session = Depends(get_db_settings)):
-    """Update company profile"""
+    """Update first company profile (legacy endpoint)"""
     try:
         profile = db.query(CompanyProfile).first()
         if not profile:
@@ -147,7 +260,6 @@ def update_company_profile(data: CompanyProfileUpdate, db: Session = Depends(get
         logger.error(f"Error updating company profile: {e}")
         raise HTTPException(status_code=500, detail="Failed to update company profile")
 
-
 # ==================== BRANCHES ====================
 
 @router.post("/branches", response_model=BranchResponse, status_code=status.HTTP_201_CREATED)
@@ -157,11 +269,23 @@ def create_branch(data: BranchCreate, db: Session = Depends(get_db_settings)):
         existing = db.query(Branch).filter(Branch.branch_code == data.branch_code).first()
         if existing:
             raise HTTPException(status_code=400, detail="Branch code already exists")
+        
+        # Validate company_id if provided
+        if data.company_id:
+            company = db.query(CompanyProfile).filter(CompanyProfile.id == data.company_id).first()
+            if not company:
+                raise HTTPException(status_code=400, detail="Invalid company reference")
 
         branch = Branch(**data.model_dump())
         db.add(branch)
         db.commit()
         db.refresh(branch)
+        
+        # Add company_name to response
+        if branch.company_id:
+            company = db.query(CompanyProfile).filter(CompanyProfile.id == branch.company_id).first()
+            branch.company_name = company.company_name if company else None
+        
         return branch
     except HTTPException:
         raise
@@ -173,11 +297,21 @@ def create_branch(data: BranchCreate, db: Session = Depends(get_db_settings)):
 
 @router.get("/branches", response_model=List[BranchResponse])
 def get_branches(skip: int = 0, limit: Optional[int] = None, is_active: Optional[bool] = None, db: Session = Depends(get_db_settings)):
-    """Get all branches"""
+    """Get all branches with company names"""
     query = db.query(Branch)
     if is_active is not None:
         query = query.filter(Branch.is_active == is_active)
-    return query.order_by(Branch.id.desc()).offset(skip).limit(limit).all()
+    branches = query.order_by(Branch.id.desc()).offset(skip).limit(limit).all()
+    
+    # Add company names
+    for branch in branches:
+        if branch.company_id:
+            company = db.query(CompanyProfile).filter(CompanyProfile.id == branch.company_id).first()
+            branch.company_name = company.company_name if company else "Unassigned"
+        else:
+            branch.company_name = "Unassigned"
+    
+    return branches
 
 
 @router.get("/branches/{branch_id}", response_model=BranchResponse)
@@ -186,6 +320,14 @@ def get_branch(branch_id: int, db: Session = Depends(get_db_settings)):
     branch = db.query(Branch).filter(Branch.id == branch_id).first()
     if not branch:
         raise HTTPException(status_code=404, detail="Branch not found")
+    
+    # Add company name
+    if branch.company_id:
+        company = db.query(CompanyProfile).filter(CompanyProfile.id == branch.company_id).first()
+        branch.company_name = company.company_name if company else "Unassigned"
+    else:
+        branch.company_name = "Unassigned"
+    
     return branch
 
 
@@ -196,6 +338,12 @@ def update_branch(branch_id: int, data: BranchUpdate, db: Session = Depends(get_
         branch = db.query(Branch).filter(Branch.id == branch_id).first()
         if not branch:
             raise HTTPException(status_code=404, detail="Branch not found")
+        
+        # Validate company_id if being updated
+        if data.company_id is not None:
+            company = db.query(CompanyProfile).filter(CompanyProfile.id == data.company_id).first()
+            if not company:
+                raise HTTPException(status_code=400, detail="Invalid company reference")
 
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
@@ -203,6 +351,14 @@ def update_branch(branch_id: int, data: BranchUpdate, db: Session = Depends(get_
 
         db.commit()
         db.refresh(branch)
+        
+        # Add company name
+        if branch.company_id:
+            company = db.query(CompanyProfile).filter(CompanyProfile.id == branch.company_id).first()
+            branch.company_name = company.company_name if company else "Unassigned"
+        else:
+            branch.company_name = "Unassigned"
+        
         return branch
     except HTTPException:
         raise
@@ -670,9 +826,18 @@ def delete_tax(tax_id: int, db: Session = Depends(get_db_settings)):
 # ==================== UOM CATEGORIES ====================
 
 @router.post("/uom-categories", response_model=UoMCategoryResponse, status_code=status.HTTP_201_CREATED)
+@warn_legacy_uom_table("UoMCategory")
 def create_uom_category(data: UoMCategoryCreate, db: Session = Depends(get_db_settings)):
-    """Create a new UoM category"""
+    """
+    Create a new UoM category
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
     try:
+        log_legacy_model_access(UoMCategory, "INSERT")
         existing = db.query(UoMCategory).filter(UoMCategory.uom_category == data.uom_category).first()
         if existing:
             raise HTTPException(status_code=400, detail="UoM category already exists")
@@ -691,8 +856,17 @@ def create_uom_category(data: UoMCategoryCreate, db: Session = Depends(get_db_se
 
 
 @router.get("/uom-categories", response_model=List[UoMCategoryResponse])
+@warn_legacy_uom_table("UoMCategory")
 def get_uom_categories(skip: int = 0, limit: Optional[int] = None, is_active: Optional[bool] = None, db: Session = Depends(get_db_settings)):
-    """Get all UoM categories"""
+    """
+    Get all UoM categories
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoMCategory, "SELECT")
     query = db.query(UoMCategory)
     if is_active is not None:
         query = query.filter(UoMCategory.is_active == is_active)
@@ -700,8 +874,17 @@ def get_uom_categories(skip: int = 0, limit: Optional[int] = None, is_active: Op
 
 
 @router.get("/uom-categories/{category_id}", response_model=UoMCategoryResponse)
+@warn_legacy_uom_table("UoMCategory")
 def get_uom_category(category_id: int, db: Session = Depends(get_db_settings)):
-    """Get a specific UoM category"""
+    """
+    Get a specific UoM category
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoMCategory, "SELECT", category_id)
     category = db.query(UoMCategory).filter(UoMCategory.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="UoM category not found")
@@ -709,9 +892,18 @@ def get_uom_category(category_id: int, db: Session = Depends(get_db_settings)):
 
 
 @router.put("/uom-categories/{category_id}", response_model=UoMCategoryResponse)
+@warn_legacy_uom_table("UoMCategory")
 def update_uom_category(category_id: int, data: UoMCategoryUpdate, db: Session = Depends(get_db_settings)):
-    """Update a UoM category"""
+    """
+    Update a UoM category
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
     try:
+        log_legacy_model_access(UoMCategory, "UPDATE", category_id)
         category = db.query(UoMCategory).filter(UoMCategory.id == category_id).first()
         if not category:
             raise HTTPException(status_code=404, detail="UoM category not found")
@@ -732,9 +924,18 @@ def update_uom_category(category_id: int, data: UoMCategoryUpdate, db: Session =
 
 
 @router.delete("/uom-categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+@warn_legacy_uom_table("UoMCategory")
 def delete_uom_category(category_id: int, db: Session = Depends(get_db_settings)):
-    """Delete a UoM category"""
+    """
+    Delete a UoM category
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
     try:
+        log_legacy_model_access(UoMCategory, "DELETE", category_id)
         category = db.query(UoMCategory).filter(UoMCategory.id == category_id).first()
         if not category:
             raise HTTPException(status_code=404, detail="UoM category not found")
@@ -753,9 +954,18 @@ def delete_uom_category(category_id: int, db: Session = Depends(get_db_settings)
 # ==================== UOM ====================
 
 @router.post("/uom", response_model=UoMResponse, status_code=status.HTTP_201_CREATED)
+@warn_legacy_uom_table("UoM")
 def create_uom(data: UoMCreate, db: Session = Depends(get_db_settings)):
-    """Create a new UoM"""
+    """
+    Create a new UoM
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
     try:
+        log_legacy_model_access(UoM, "INSERT")
         uom = UoM(**data.model_dump())
         db.add(uom)
         db.commit()
@@ -768,8 +978,17 @@ def create_uom(data: UoMCreate, db: Session = Depends(get_db_settings)):
 
 
 @router.get("/uom", response_model=List[UoMResponse])
+@warn_legacy_uom_table("UoM")
 def get_uoms(skip: int = 0, limit: Optional[int] = None, category_id: Optional[int] = None, is_active: Optional[bool] = None, db: Session = Depends(get_db_settings)):
-    """Get all UoMs"""
+    """
+    Get all UoMs
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT")
     query = db.query(UoM)
     if category_id:
         query = query.filter(UoM.category_id == category_id)
@@ -779,13 +998,22 @@ def get_uoms(skip: int = 0, limit: Optional[int] = None, category_id: Optional[i
 
 
 @router.get("/uom/for-selector", response_model=List[UoMForSelector])
+@warn_legacy_uom_table("UoM")
 def get_uoms_for_selector(
     category_id: Optional[int] = None,
     category_name: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db_settings)
 ):
-    """Optimized endpoint for UOM selector component - returns simplified UoM data"""
+    """
+    Optimized endpoint for UOM selector component - returns simplified UoM data
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT")
     query = db.query(UoM).filter(UoM.is_active == True)
 
     # Filter by category ID or name
@@ -830,8 +1058,17 @@ def get_uoms_for_selector(
 
 
 @router.get("/uom/{uom_id}", response_model=UoMResponse)
+@warn_legacy_uom_table("UoM")
 def get_uom(uom_id: int, db: Session = Depends(get_db_settings)):
-    """Get a specific UoM"""
+    """
+    Get a specific UoM
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT", uom_id)
     uom = db.query(UoM).filter(UoM.id == uom_id).first()
     if not uom:
         raise HTTPException(status_code=404, detail="UoM not found")
@@ -839,9 +1076,18 @@ def get_uom(uom_id: int, db: Session = Depends(get_db_settings)):
 
 
 @router.put("/uom/{uom_id}", response_model=UoMResponse)
+@warn_legacy_uom_table("UoM")
 def update_uom(uom_id: int, data: UoMUpdate, db: Session = Depends(get_db_settings)):
-    """Update a UoM"""
+    """
+    Update a UoM
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
     try:
+        log_legacy_model_access(UoM, "UPDATE", uom_id)
         uom = db.query(UoM).filter(UoM.id == uom_id).first()
         if not uom:
             raise HTTPException(status_code=404, detail="UoM not found")
@@ -862,9 +1108,18 @@ def update_uom(uom_id: int, data: UoMUpdate, db: Session = Depends(get_db_settin
 
 
 @router.delete("/uom/{uom_id}", status_code=status.HTTP_204_NO_CONTENT)
+@warn_legacy_uom_table("UoM")
 def delete_uom(uom_id: int, db: Session = Depends(get_db_settings)):
-    """Delete a UoM"""
+    """
+    Delete a UoM
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
     try:
+        log_legacy_model_access(UoM, "DELETE", uom_id)
         uom = db.query(UoM).filter(UoM.id == uom_id).first()
         if not uom:
             raise HTTPException(status_code=404, detail="UoM not found")
@@ -883,8 +1138,17 @@ def delete_uom(uom_id: int, db: Session = Depends(get_db_settings)):
 # ==================== UOM ENHANCED ENDPOINTS ====================
 
 @router.get("/uom-categories/with-counts", response_model=List[UoMCategoryWithUnits])
+@warn_legacy_uom_table("UoMCategory")
 def get_uom_categories_with_counts(is_active: Optional[bool] = None, db: Session = Depends(get_db_settings)):
-    """Get all UoM categories with unit counts for dashboard display"""
+    """
+    Get all UoM categories with unit counts for dashboard display
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoMCategory, "SELECT")
     query = db.query(UoMCategory)
     if is_active is not None:
         query = query.filter(UoMCategory.is_active == is_active)
@@ -919,8 +1183,17 @@ def get_uom_categories_with_counts(is_active: Optional[bool] = None, db: Session
 
 
 @router.post("/uom/convert", response_model=UoMConversionResponse)
+@warn_legacy_uom_table("UoM")
 def convert_uom(request: UoMConversionRequest, db: Session = Depends(get_db_settings)):
-    """Convert a value between two compatible UoMs (must be in same category)"""
+    """
+    Convert a value between two compatible UoMs (must be in same category)
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT")
     from_uom = db.query(UoM).filter(UoM.id == request.from_uom_id).first()
     if not from_uom:
         raise HTTPException(status_code=404, detail="Source UoM not found")
@@ -934,31 +1207,45 @@ def convert_uom(request: UoMConversionRequest, db: Session = Depends(get_db_sett
         raise HTTPException(status_code=400, detail="Cannot convert between different UoM categories")
 
     # Convert: first to base unit, then to target unit
-    # value_in_base = value * from_conversion_to_base
-    # result = value_in_base / to_conversion_to_base
-    from decimal import Decimal
+    # Formula: target_value = source_value * (source_factor / target_factor)
+    # Maintains precision to 6 decimal places, displays rounded to decimal_places
+    from decimal import Decimal, ROUND_HALF_UP
     
-    # Use new conversion_to_base field if available, fallback to factor
-    from_factor = Decimal(str(from_uom.conversion_to_base)) if hasattr(from_uom, 'conversion_to_base') and from_uom.conversion_to_base else (Decimal(str(from_uom.factor)) if from_uom.factor else Decimal("1"))
-    to_factor = Decimal(str(to_uom.conversion_to_base)) if hasattr(to_uom, 'conversion_to_base') and to_uom.conversion_to_base else (Decimal(str(to_uom.factor)) if to_uom.factor else Decimal("1"))
+    from_factor = Decimal(str(from_uom.factor)) if from_uom.factor else Decimal("1")
+    to_factor = Decimal(str(to_uom.factor)) if to_uom.factor else Decimal("1")
 
-    value_in_base = request.value * from_factor
+    # Calculate with high precision (6 decimal places minimum)
+    value_in_base = Decimal(str(request.value)) * from_factor
     result = value_in_base / to_factor
     conversion_factor = from_factor / to_factor
+    
+    # Round result to specified decimal places (default 2)
+    decimal_places = to_uom.decimal_places if to_uom.decimal_places is not None else 2
+    quantizer = Decimal(10) ** -decimal_places
+    rounded_result = float(result.quantize(quantizer, rounding=ROUND_HALF_UP))
 
     return UoMConversionResponse(
         from_uom=from_uom.symbol,
         to_uom=to_uom.symbol,
         from_value=request.value,
-        to_value=round(result, to_uom.decimal_places or 2),
-        conversion_factor=conversion_factor,
+        to_value=rounded_result,
+        conversion_factor=float(conversion_factor),
         formula=f"1 {from_uom.symbol} = {conversion_factor} {to_uom.symbol}"
     )
 
 
 @router.get("/uom/compatible/{uom_id}", response_model=List[UoMResponse])
+@warn_legacy_uom_table("UoM")
 def get_compatible_uoms(uom_id: int, db: Session = Depends(get_db_settings)):
-    """Get all UoMs compatible for conversion with given UoM (same category)"""
+    """
+    Get all UoMs compatible for conversion with given UoM (same category)
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT", uom_id)
     uom = db.query(UoM).filter(UoM.id == uom_id).first()
     if not uom:
         raise HTTPException(status_code=404, detail="UoM not found")
@@ -974,8 +1261,17 @@ def get_compatible_uoms(uom_id: int, db: Session = Depends(get_db_settings)):
 
 
 @router.post("/uom/validate-symbol", response_model=UoMValidationResponse)
+@warn_legacy_uom_table("UoM")
 def validate_uom_symbol(request: UoMValidationRequest, db: Session = Depends(get_db_settings)):
-    """Check if a UoM symbol is unique within a category"""
+    """
+    Check if a UoM symbol is unique within a category
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT")
     query = db.query(UoM).filter(
         UoM.category_id == request.category_id,
         UoM.symbol == request.symbol
@@ -997,6 +1293,7 @@ def validate_uom_symbol(request: UoMValidationRequest, db: Session = Depends(get
 
 
 @router.get("/uom/search", response_model=List[UoMWithCategory])
+@warn_legacy_uom_table("UoM")
 def search_uoms(
     q: str,
     category_id: Optional[int] = None,
@@ -1004,7 +1301,15 @@ def search_uoms(
     limit: int = 50,
     db: Session = Depends(get_db_settings)
 ):
-    """Search UoMs by name, symbol, or display name"""
+    """
+    Search UoMs by name, symbol, or display name
+    
+    ⚠️  DEPRECATED ENDPOINT ⚠️
+    This endpoint uses legacy UoM tables and will be removed in a future version.
+    Use the Unit Conversion System in db-units database instead.
+    Migration guide: /docs/migration-guide-legacy-uom.md
+    """
+    log_legacy_model_access(UoM, "SELECT")
     search_term = f"%{q}%"
     query = db.query(UoM).filter(
         (UoM.name.ilike(search_term)) |
@@ -1638,6 +1943,23 @@ def delete_country(country_pk: int, db: Session = Depends(get_db_settings)):
         raise HTTPException(status_code=500, detail="Failed to delete country")
 
 
+@router.get("/countries/{country_pk}/ports", response_model=List[PortResponse])
+def get_country_ports(country_pk: int, skip: int = 0, limit: Optional[int] = None, db: Session = Depends(get_db_settings)):
+    """Get all ports for a specific country"""
+    country = db.query(Country).filter(Country.id == country_pk).first()
+    if not country:
+        raise HTTPException(status_code=404, detail="Country not found")
+    
+    query = db.query(Port).filter(Port.country_id == country_pk)
+    ports = query.order_by(Port.port_name).offset(skip).limit(limit).all()
+    
+    # Add country name to each port
+    for port in ports:
+        port.country_name = country.country_name
+    
+    return ports
+
+
 # ==================== CITIES ====================
 
 @router.post("/cities", response_model=CityResponse, status_code=status.HTTP_201_CREATED)
@@ -1729,14 +2051,23 @@ def delete_city(city_pk: int, db: Session = Depends(get_db_settings)):
 def create_port(data: PortCreate, db: Session = Depends(get_db_settings)):
     """Create a new port"""
     try:
-        existing = db.query(Port).filter(Port.locode == data.locode).first()
+        # Validate country_id
+        country = db.query(Country).filter(Country.id == data.country_id).first()
+        if not country:
+            raise HTTPException(status_code=400, detail="Invalid country reference")
+        
+        existing = db.query(Port).filter(Port.port_code == data.port_code).first()
         if existing:
-            raise HTTPException(status_code=400, detail="Port LOCODE already exists")
+            raise HTTPException(status_code=400, detail="Port code already exists")
 
         port = Port(**data.model_dump())
         db.add(port)
         db.commit()
         db.refresh(port)
+        
+        # Add country name to response
+        port.country_name = country.country_name
+        
         return port
     except HTTPException:
         raise
@@ -1754,7 +2085,14 @@ def get_ports(skip: int = 0, limit: Optional[int] = None, country_id: Optional[i
         query = query.filter(Port.country_id == country_id)
     if is_active is not None:
         query = query.filter(Port.is_active == is_active)
-    return query.order_by(Port.port_name).offset(skip).limit(limit).all()
+    ports = query.order_by(Port.port_name).offset(skip).limit(limit).all()
+    
+    # Add country names
+    for port in ports:
+        country = db.query(Country).filter(Country.id == port.country_id).first()
+        port.country_name = country.country_name if country else "Unknown"
+    
+    return ports
 
 
 @router.get("/ports/{port_id}", response_model=PortResponse)
@@ -1763,6 +2101,11 @@ def get_port(port_id: int, db: Session = Depends(get_db_settings)):
     port = db.query(Port).filter(Port.id == port_id).first()
     if not port:
         raise HTTPException(status_code=404, detail="Port not found")
+    
+    # Add country name
+    country = db.query(Country).filter(Country.id == port.country_id).first()
+    port.country_name = country.country_name if country else "Unknown"
+    
     return port
 
 
@@ -1773,6 +2116,12 @@ def update_port(port_id: int, data: PortUpdate, db: Session = Depends(get_db_set
         port = db.query(Port).filter(Port.id == port_id).first()
         if not port:
             raise HTTPException(status_code=404, detail="Port not found")
+        
+        # Validate country_id if being updated
+        if data.country_id is not None:
+            country = db.query(Country).filter(Country.id == data.country_id).first()
+            if not country:
+                raise HTTPException(status_code=400, detail="Invalid country reference")
 
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
@@ -1780,6 +2129,11 @@ def update_port(port_id: int, data: PortUpdate, db: Session = Depends(get_db_set
 
         db.commit()
         db.refresh(port)
+        
+        # Add country name
+        country = db.query(Country).filter(Country.id == port.country_id).first()
+        port.country_name = country.country_name if country else "Unknown"
+        
         return port
     except HTTPException:
         raise

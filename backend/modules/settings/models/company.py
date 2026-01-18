@@ -1,14 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Numeric
 from sqlalchemy.sql import func
 from core.database import BaseSettings
 
 
 class CompanyProfile(BaseSettings):
-    """Company Profile - Single record for company-wide settings"""
+    """Company Profile - Supports multiple companies"""
     __tablename__ = "company_profile"
 
     id = Column(Integer, primary_key=True, index=True)
-    company_name = Column(String(255), nullable=False)
+    company_name = Column(String(255), nullable=False, index=True)
     legal_name = Column(String(255), nullable=True)
     registration_number = Column(String(100), nullable=True)
     tax_id = Column(String(100), nullable=True)
@@ -25,6 +25,7 @@ class CompanyProfile(BaseSettings):
     postal_code = Column(String(20), nullable=True)
     default_currency_id = Column(Integer, nullable=True)
     fiscal_year_start_month = Column(Integer, default=1)  # 1-12
+    is_active = Column(Boolean, default=True)
     remarks = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -35,6 +36,7 @@ class Branch(BaseSettings):
     __tablename__ = "branches"
 
     id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, nullable=True, index=True)  # Link to company_profile
     branch_code = Column(String(50), unique=True, nullable=False, index=True)
     branch_name = Column(String(255), nullable=False)
     branch_type = Column(String(50), nullable=True)  # Head Office, Factory, Warehouse, Sales Office
@@ -50,5 +52,37 @@ class Branch(BaseSettings):
     manager_name = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     remarks = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class Country(BaseSettings):
+    """Country Master Data"""
+    __tablename__ = "countries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    country_name = Column(String(255), nullable=False, unique=True, index=True)
+    country_code = Column(String(3), nullable=False, unique=True)  # ISO 3166-1 alpha-3
+    country_code_2 = Column(String(2), nullable=True)  # ISO 3166-1 alpha-2
+    region = Column(String(100), nullable=True)  # Asia, Europe, Americas, etc.
+    currency_code = Column(String(3), nullable=True)
+    phone_code = Column(String(10), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class Port(BaseSettings):
+    """Port Master Data"""
+    __tablename__ = "ports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    country_id = Column(Integer, nullable=False, index=True)  # Reference to countries.id
+    port_name = Column(String(255), nullable=False, index=True)
+    port_code = Column(String(10), nullable=False, unique=True)  # UN/LOCODE
+    port_type = Column(String(50), nullable=True)  # Seaport, Airport, Inland Port
+    latitude = Column(Numeric(10, 7), nullable=True)
+    longitude = Column(Numeric(10, 7), nullable=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

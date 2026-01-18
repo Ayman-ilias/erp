@@ -1,0 +1,3 @@
+-- Size & Color Database Initialization
+-- This file is loaded when the database container is first created
+-- Tables will be created by SQLAlchemy migrations

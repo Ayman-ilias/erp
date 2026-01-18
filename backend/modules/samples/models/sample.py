@@ -152,7 +152,7 @@ class SampleRequest(Base):
     yarn_details = Column(JSON, nullable=True)  # Cached yarn details
     trims_ids = Column(JSON, nullable=True)  # Array of trim IDs (buttons, zippers, labels)
     trims_details = Column(JSON, nullable=True)  # Cached trim details
-    decorative_part = Column(String, nullable=True)  # Embroidery, Print, etc.
+    decorative_part = Column(JSON, nullable=True)  # Array of decorative elements (Embroidery, Print, etc.)
     decorative_details = Column(Text, nullable=True)
 
     # Dates
@@ -163,12 +163,13 @@ class SampleRequest(Base):
     # Sample details
     request_pcs = Column(Integer, nullable=True)  # Number of pieces requested
     sample_category = Column(String, nullable=True)  # Proto, Fit, PP, SMS, Size Set, etc.
+    priority = Column(String(20), default='normal')  # Priority: urgent, high, normal, low
     color_ids = Column(JSON, nullable=True)  # Array of color IDs
     color_name = Column(String, nullable=True)
     size_ids = Column(JSON, nullable=True)  # Array of size IDs
     size_name = Column(String, nullable=True)
     yarn_ids = Column(JSON, nullable=True)  # Array of yarn IDs (multiple yarns)
-    additional_instruction = Column(Text, nullable=True)
+    additional_instruction = Column(JSON, nullable=True)  # Array of instructions
 
     # Attachments
     techpack_url = Column(String, nullable=True)  # File URL for techpack
@@ -297,7 +298,7 @@ class SampleRequiredMaterial(Base):
 
     # Quantity
     required_quantity = Column(Float, nullable=False)
-    uom = Column(String, nullable=False)  # kg, meter, piece, etc.
+    unit_id = Column(Integer, nullable=False, index=True)  # Reference to units table in db-units (cross-database reference)
 
     remarks = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -420,9 +421,9 @@ class StyleVariantMaterial(Base):
 
     # Quantity and weight
     required_quantity = Column(Float, nullable=True)
-    uom = Column(String, nullable=True)
+    unit_id = Column(Integer, nullable=True, index=True)  # Reference to units table in db-units (cross-database reference)
     weight = Column(Float, nullable=True)  # Auto-calculated based on product
-    weight_uom = Column(String, default="kg")
+    weight_unit_id = Column(Integer, nullable=True, index=True)  # Reference to units table in db-units (cross-database reference)
 
     # Condition/Notes
     condition = Column(Text, nullable=True)

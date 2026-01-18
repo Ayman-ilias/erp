@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
 from core.database import get_db_merchandiser
+from core.logging import setup_logging
 from modules.merchandiser.models.merchandiser import (
     YarnDetail, FabricDetail, TrimsDetail, AccessoriesDetail,
     FinishedGoodDetail, PackingGoodDetail, SizeChart,
@@ -45,6 +46,7 @@ from modules.merchandiser.schemas.merchandiser import (
 )
 
 router = APIRouter(tags=["Merchandiser"])
+logger = setup_logging()
 
 
 # ============================================================================
@@ -771,6 +773,10 @@ async def create_sample_primary_info(
 ):
     """Create a new sample request (merchandising creates sample requests that go to sample department)"""
     import re
+    from core.database import SessionLocalSamples
+    from modules.samples.models.sample import SampleRequest
+    from core.services.buyer_service import BuyerService
+    import json
     
     # Generate sample_id if not provided: SMP-Name-A001 format
     if not sample_data.sample_id:
@@ -809,6 +815,114 @@ async def create_sample_primary_info(
     db.add(db_sample)
     db.commit()
     db.refresh(db_sample)
+    
+    # AUTO-SYNC: Create corresponding SampleRequest in samples database
+    samples_db = SessionLocalSamples()
+    try:
+        # Get buyer name
+        buyer_name = None
+        try:
+            buyer_service = BuyerService()
+            buyer_info = buyer_service.get_by_id(db_sample.buyer_id)
+            if buyer_info:
+                buyer_name = buyer_info.get("buyer_name")
+        except Exception as buyer_error:
+            logger.warning(f"Could not fetch buyer name for buyer_id {db_sample.buyer_id}: {buyer_error}")
+        
+        # Handle yarn_ids
+        yarn_ids_json = db_sample.yarn_ids or []
+        yarn_id = yarn_ids_json[0] if yarn_ids_json and len(yarn_ids_json) > 0 else (db_sample.yarn_id or None)
+        
+        # Handle trims_ids
+        trims_ids_json = db_sample.trims_ids or []
+        
+        # Handle color_ids
+        color_ids_json = db_sample.color_ids or []
+        
+        # Handle size_ids
+        size_ids_json = db_sample.size_ids or []
+        
+        # Map ply (convert string to int if possible)
+        ply_value = None
+        if db_sample.ply:
+            try:
+                ply_value = int(db_sample.ply)
+            except (ValueError, TypeError):
+                pass
+        
+        # Handle decorative_part - convert array to comma-separated string
+        decorative_part_str = None
+        if db_sample.decorative_part:
+            if isinstance(db_sample.decorative_part, list):
+                decorative_part_str = ", ".join(db_sample.decorative_part)
+            else:
+                decorative_part_str = str(db_sample.decorative_part)
+        
+        # Handle additional_instruction - convert array to newline-separated string
+        additional_instruction_str = None
+        if db_sample.additional_instruction:
+            if isinstance(db_sample.additional_instruction, list):
+                instructions = []
+                for inst in db_sample.additional_instruction:
+                    if isinstance(inst, dict):
+                        instruction_text = inst.get('instruction', '')
+                        done_marker = "✓" if inst.get('done', False) else ""
+                        instructions.append(f"{done_marker} {instruction_text}".strip())
+                    else:
+                        instructions.append(str(inst))
+                additional_instruction_str = "\n".join(instructions) if instructions else None
+            else:
+                additional_instruction_str = str(db_sample.additional_instruction)
+        
+        # Handle techpack_files - use first file's url/filename
+        techpack_url = None
+        techpack_filename = None
+        if db_sample.techpack_files:
+            if isinstance(db_sample.techpack_files, list) and len(db_sample.techpack_files) > 0:
+                first_file = db_sample.techpack_files[0]
+                if isinstance(first_file, dict):
+                    techpack_url = first_file.get('url')
+                    techpack_filename = first_file.get('filename')
+        
+        # Create SampleRequest
+        sample_request = SampleRequest(
+            sample_id=db_sample.sample_id,
+            buyer_id=db_sample.buyer_id,
+            buyer_name=buyer_name or db_sample.buyer_name,
+            sample_name=db_sample.sample_name,
+            item=db_sample.item,
+            gauge=db_sample.gauge,
+            ply=ply_value,
+            sample_category=db_sample.sample_category,
+            priority=db_sample.priority or 'normal',
+            color_ids=color_ids_json,
+            color_name=db_sample.color_name,
+            size_ids=size_ids_json,
+            size_name=db_sample.size_name,
+            yarn_ids=yarn_ids_json,
+            yarn_id=yarn_id,
+            yarn_details=db_sample.yarn_details,
+            trims_ids=trims_ids_json,
+            trims_details=db_sample.trims_details,
+            decorative_part=decorative_part_str,
+            decorative_details=None,
+            yarn_handover_date=db_sample.yarn_handover_date,
+            trims_handover_date=db_sample.trims_handover_date,
+            required_date=db_sample.required_date,
+            request_pcs=db_sample.request_pcs,
+            additional_instruction=additional_instruction_str,
+            techpack_url=techpack_url,
+            techpack_filename=techpack_filename,
+            current_status="Pending"
+        )
+        samples_db.add(sample_request)
+        samples_db.commit()
+        logger.info(f"Auto-synced sample {db_sample.sample_id} to samples database")
+    except Exception as sync_error:
+        logger.error(f"Failed to auto-sync sample to samples database: {sync_error}")
+        # Don't fail the main operation if sync fails
+    finally:
+        samples_db.close()
     
     return db_sample
 
@@ -953,6 +1067,7 @@ async def sync_samples_to_samples_db(db: Session = Depends(get_db_merchandiser))
                 gauge=sample.gauge,
                 ply=ply_value,
                 sample_category=sample.sample_category,
+                priority=sample.priority or 'normal',  # Include priority
                 color_ids=color_ids_json,  # All color IDs
                 color_name=color_name_final or sample.color_name,
                 size_ids=size_ids_json,  # All size IDs

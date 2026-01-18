@@ -206,6 +206,93 @@ export const QUERY_KEYS = {
     DASHBOARD: () => ({ key: "reports-dashboard" as const }),
     EXPORT: (type: string) => ({ key: `reports-export-${type}` as const }),
   } as const,
+
+  // Unit Conversion System
+  UNITS: {
+    CATEGORIES: {
+      LIST: () => ({ key: "units-categories-list" as const }),
+      LIST_WITH_COUNTS: () => ({ key: "units-categories-with-counts" as const }),
+      DETAIL: (id: number) => ({ key: `units-category-${id}` as const }),
+    } as const,
+    LIST: (categoryId?: number, unitType?: string) => ({
+      key: categoryId
+        ? unitType
+          ? (`units-list-${categoryId}-${unitType}` as const)
+          : (`units-list-${categoryId}` as const)
+        : unitType
+        ? (`units-list-type-${unitType}` as const)
+        : ("units-list" as const),
+    }),
+    DETAIL: (id: number) => ({ key: `unit-${id}` as const }),
+    FOR_SELECTOR: (categoryId?: number, categoryName?: string) => ({
+      key: categoryId
+        ? (`units-selector-${categoryId}` as const)
+        : categoryName
+        ? (`units-selector-name-${categoryName}` as const)
+        : ("units-selector-all" as const),
+    }),
+    SEARCH: (query: string, categoryId?: number) => ({
+      key: categoryId
+        ? (`units-search-${query}-${categoryId}` as const)
+        : (`units-search-${query}` as const),
+    }),
+    COMPATIBLE: (unitId: number) => ({ key: `units-compatible-${unitId}` as const }),
+  } as const,
+
+  // Size & Color Master System
+  SIZECOLOR: {
+    SIZES: {
+      LIST: (garmentType?: string, gender?: string) => ({
+        key: garmentType
+          ? gender
+            ? (`sizecolor-sizes-${garmentType}-${gender}` as const)
+            : (`sizecolor-sizes-${garmentType}` as const)
+          : gender
+          ? (`sizecolor-sizes-gender-${gender}` as const)
+          : ("sizecolor-sizes-list" as const),
+      }),
+      FOR_SELECTOR: (garmentType?: string, gender?: string) => ({
+        key: garmentType
+          ? gender
+            ? (`sizecolor-sizes-selector-${garmentType}-${gender}` as const)
+            : (`sizecolor-sizes-selector-${garmentType}` as const)
+          : gender
+          ? (`sizecolor-sizes-selector-gender-${gender}` as const)
+          : ("sizecolor-sizes-selector-all" as const),
+      }),
+      DETAIL: (id: number) => ({ key: `sizecolor-size-${id}` as const }),
+      MEASUREMENTS: (sizeId: number) => ({ key: `sizecolor-size-measurements-${sizeId}` as const }),
+    } as const,
+    COLORS: {
+      LIST: (colorFamily?: string, colorType?: string) => ({
+        key: colorFamily
+          ? colorType
+            ? (`sizecolor-colors-${colorFamily}-${colorType}` as const)
+            : (`sizecolor-colors-${colorFamily}` as const)
+          : colorType
+          ? (`sizecolor-colors-type-${colorType}` as const)
+          : ("sizecolor-colors-list" as const),
+      }),
+      FOR_SELECTOR: (colorFamily?: string) => ({
+        key: colorFamily
+          ? (`sizecolor-colors-selector-${colorFamily}` as const)
+          : ("sizecolor-colors-selector-all" as const),
+      }),
+      DETAIL: (id: number) => ({ key: `sizecolor-color-${id}` as const }),
+      HM_CODES: (colorId: number) => ({ key: `sizecolor-color-hm-codes-${colorId}` as const }),
+      TCX_CODES: (colorId: number) => ({ key: `sizecolor-color-tcx-codes-${colorId}` as const }),
+    } as const,
+    SUGGESTIONS: (buyerId: number) => ({ key: `sizecolor-suggestions-${buyerId}` as const }),
+    OPTIONS: {
+      GARMENT_TYPES: () => ({ key: "sizecolor-options-garment-types" as const }),
+      GENDERS: () => ({ key: "sizecolor-options-genders" as const }),
+      FIT_TYPES: () => ({ key: "sizecolor-options-fit-types" as const }),
+      COLOR_FAMILIES: () => ({ key: "sizecolor-options-color-families" as const }),
+      COLOR_TYPES: () => ({ key: "sizecolor-options-color-types" as const }),
+      COLOR_VALUES: () => ({ key: "sizecolor-options-color-values" as const }),
+      FINISH_TYPES: () => ({ key: "sizecolor-options-finish-types" as const }),
+    } as const,
+  } as const,
 } as const;
 
 // ============================================================================

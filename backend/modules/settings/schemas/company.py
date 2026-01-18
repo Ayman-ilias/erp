@@ -26,6 +26,11 @@ class CompanyProfileBase(BaseModel):
     remarks: Optional[str] = None
 
 
+class CompanyProfileCreate(CompanyProfileBase):
+    """Schema for creating a new company"""
+    pass
+
+
 class CompanyProfileUpdate(BaseModel):
     company_name: Optional[str] = None
     legal_name: Optional[str] = None
@@ -44,11 +49,13 @@ class CompanyProfileUpdate(BaseModel):
     postal_code: Optional[str] = None
     default_currency_id: Optional[int] = None
     fiscal_year_start_month: Optional[int] = None
+    is_active: Optional[bool] = None
     remarks: Optional[str] = None
 
 
 class CompanyProfileResponse(CompanyProfileBase):
     id: int
+    is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -59,6 +66,7 @@ class CompanyProfileResponse(CompanyProfileBase):
 # ==================== Branch ====================
 
 class BranchBase(BaseModel):
+    company_id: Optional[int] = None  # Link to company
     branch_code: str
     branch_name: str
     branch_type: Optional[str] = None
@@ -81,6 +89,7 @@ class BranchCreate(BranchBase):
 
 
 class BranchUpdate(BaseModel):
+    company_id: Optional[int] = None
     branch_code: Optional[str] = None
     branch_name: Optional[str] = None
     branch_type: Optional[str] = None
@@ -100,6 +109,78 @@ class BranchUpdate(BaseModel):
 
 class BranchResponse(BranchBase):
     id: int
+    company_name: Optional[str] = None  # Populated from join
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Country ====================
+
+class CountryBase(BaseModel):
+    country_name: str
+    country_code: str  # ISO 3166-1 alpha-3
+    country_code_2: Optional[str] = None  # ISO 3166-1 alpha-2
+    region: Optional[str] = None
+    currency_code: Optional[str] = None
+    phone_code: Optional[str] = None
+
+
+class CountryCreate(CountryBase):
+    pass
+
+
+class CountryUpdate(BaseModel):
+    country_name: Optional[str] = None
+    country_code: Optional[str] = None
+    country_code_2: Optional[str] = None
+    region: Optional[str] = None
+    currency_code: Optional[str] = None
+    phone_code: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class CountryResponse(CountryBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Port ====================
+
+class PortBase(BaseModel):
+    country_id: int
+    port_name: str
+    port_code: str  # UN/LOCODE
+    port_type: Optional[str] = None  # Seaport, Airport, Inland Port
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class PortCreate(PortBase):
+    pass
+
+
+class PortUpdate(BaseModel):
+    country_id: Optional[int] = None
+    port_name: Optional[str] = None
+    port_code: Optional[str] = None
+    port_type: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
+class PortResponse(PortBase):
+    id: int
+    country_name: Optional[str] = None  # Populated from join
+    is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
 

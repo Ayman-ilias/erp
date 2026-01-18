@@ -37,7 +37,9 @@ import { Plus, ArrowLeft, Loader2, Edit, Trash2, Check, ChevronsUpDown } from "l
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { toast } from "sonner";
-import { UoMSelector } from "@/components/uom/uom-selector";
+import { UnitSelector } from "@/components/uom/UnitSelector";
+import { InlineConverter } from "@/components/uom/InlineConverter";
+import { UnitDisplay } from "@/components/uom/UnitDisplay";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -576,7 +578,22 @@ export default function MaterialDetailsPage() {
                           <Badge variant="secondary">{fabric.category || "-"}</Badge>
                         </TableCell>
                         <TableCell>{fabric.type || "-"}</TableCell>
-                        <TableCell>{fabric.gsm ? `${fabric.gsm} GSM` : "-"}</TableCell>
+                        <TableCell>
+                          {fabric.gsm && fabric.unit_id ? (
+                            <span className="flex items-center gap-1">
+                              {fabric.gsm}
+                              <UnitDisplay 
+                                unitId={fabric.unit_id} 
+                                showFullName={false}
+                                showUnitType={false}
+                              />
+                            </span>
+                          ) : fabric.gsm ? (
+                            `${fabric.gsm} GSM`
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
                         <TableCell>{fabric.width || "-"}</TableCell>
                         <TableCell>{fabric.composition || "-"}</TableCell>
                         <TableCell className="text-right space-x-2">
@@ -660,7 +677,17 @@ export default function MaterialDetailsPage() {
                           <Badge variant="secondary">{trims.category || "-"}</Badge>
                         </TableCell>
                         <TableCell>{trims.sub_category || "-"}</TableCell>
-                        <TableCell>{trims.uom}</TableCell>
+                        <TableCell>
+                          {trims.unit_id ? (
+                            <UnitDisplay 
+                              unitId={trims.unit_id} 
+                              showFullName={false}
+                              showUnitType={false}
+                            />
+                          ) : (
+                            trims.uom || "-"
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={
                             trims.consumable_flag === "yes" || trims.consumable_flag === true ? "default" :
@@ -751,7 +778,17 @@ export default function MaterialDetailsPage() {
                           <Badge variant="secondary">{accessory.category || "-"}</Badge>
                         </TableCell>
                         <TableCell>{accessory.sub_category || "-"}</TableCell>
-                        <TableCell>{accessory.uom}</TableCell>
+                        <TableCell>
+                          {accessory.unit_id ? (
+                            <UnitDisplay 
+                              unitId={accessory.unit_id} 
+                              showFullName={false}
+                              showUnitType={false}
+                            />
+                          ) : (
+                            accessory.uom || "-"
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={
                             accessory.consumable_flag === "yes" || accessory.consumable_flag === true ? "default" :
@@ -842,7 +879,17 @@ export default function MaterialDetailsPage() {
                           <Badge variant="secondary">{item.category || "-"}</Badge>
                         </TableCell>
                         <TableCell>{item.sub_category || "-"}</TableCell>
-                        <TableCell>{item.uom}</TableCell>
+                        <TableCell>
+                          {item.unit_id ? (
+                            <UnitDisplay 
+                              unitId={item.unit_id} 
+                              showFullName={false}
+                              showUnitType={false}
+                            />
+                          ) : (
+                            item.uom || "-"
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={
                             item.consumable_flag === "yes" || item.consumable_flag === true ? "default" :
@@ -933,7 +980,17 @@ export default function MaterialDetailsPage() {
                           <Badge variant="secondary">{item.category || "-"}</Badge>
                         </TableCell>
                         <TableCell>{item.sub_category || "-"}</TableCell>
-                        <TableCell>{item.uom}</TableCell>
+                        <TableCell>
+                          {item.unit_id ? (
+                            <UnitDisplay 
+                              unitId={item.unit_id} 
+                              showFullName={false}
+                              showUnitType={false}
+                            />
+                          ) : (
+                            item.uom || "-"
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={
                             item.consumable_flag === "yes" || item.consumable_flag === true ? "default" :
@@ -1393,7 +1450,7 @@ function FabricDialog({
     finish: "",
     composition: "",
     handfeel: "",
-    uom: "",
+    unit_id: 0,
     remarks: "",
   });
 
@@ -1414,7 +1471,7 @@ function FabricDialog({
         finish: editingFabric.finish || "",
         composition: editingFabric.composition || "",
         handfeel: editingFabric.handfeel || "",
-        uom: editingFabric.uom || "",
+        unit_id: editingFabric.unit_id || 0,
         remarks: editingFabric.remarks || "",
       });
     } else {
@@ -1433,7 +1490,7 @@ function FabricDialog({
         finish: "",
         composition: "",
         handfeel: "",
-        uom: "",
+        unit_id: 0,
         remarks: "",
       });
     }
@@ -1441,6 +1498,13 @@ function FabricDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate unit selection
+    if (!formData.unit_id || formData.unit_id === 0) {
+      toast.error("Please select a unit");
+      return;
+    }
+    
     onSubmit(formData);
   };
 
@@ -1533,16 +1597,25 @@ function FabricDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="uom">
-                UoM <span className="text-destructive">*</span>
+              <Label htmlFor="unit_id">
+                Unit <span className="text-destructive">*</span>
               </Label>
-              <UoMSelector
-                value={formData.uom}
-                onChange={(value) => setFormData({ ...formData, uom: value })}
-                categoryFilter={["Weight", "Length", "Packaging"]}
-                placeholder="Select UoM"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <UnitSelector
+                  value={formData.unit_id}
+                  onChange={(value) => setFormData({ ...formData, unit_id: value })}
+                  categoryFilter="Weight"
+                  placeholder="Select unit"
+                  className="flex-1"
+                />
+                {formData.unit_id > 0 && formData.gsm && (
+                  <InlineConverter
+                    value={parseFloat(formData.gsm) || 0}
+                    fromUnitId={formData.unit_id}
+                    categoryName="Weight"
+                  />
+                )}
+              </div>
             </div>
           </div>
           <div className="space-y-2">
@@ -1597,7 +1670,7 @@ function TrimsDialog({
     product_name: "",
     category: "",
     sub_category: "",
-    uom: "",
+    unit_id: 0,
     consumable_flag: "none" as "yes" | "no" | "none",
     remarks: "",
   });
@@ -1626,7 +1699,7 @@ function TrimsDialog({
         product_name: editingTrims.product_name || "",
         category: editingTrims.category || "",
         sub_category: editingTrims.sub_category || "",
-        uom: editingTrims.uom || "",
+        unit_id: editingTrims.unit_id || 0,
         consumable_flag: consumableValue,
         remarks: editingTrims.remarks || "",
       });
@@ -1636,7 +1709,7 @@ function TrimsDialog({
         product_name: "",
         category: "",
         sub_category: "",
-        uom: "",
+        unit_id: 0,
         consumable_flag: "none",
         remarks: "",
       });
@@ -1645,6 +1718,13 @@ function TrimsDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate unit selection
+    if (!formData.unit_id || formData.unit_id === 0) {
+      toast.error("Please select a unit");
+      return;
+    }
+    
     onSubmit(formData);
   };
 
@@ -1710,16 +1790,25 @@ function TrimsDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="uom">
-                UoM <span className="text-destructive">*</span>
+              <Label htmlFor="unit_id">
+                Unit <span className="text-destructive">*</span>
               </Label>
-              <UoMSelector
-                value={formData.uom}
-                onChange={(value) => setFormData({ ...formData, uom: value })}
-                categoryFilter={["Quantity", "Length"]}
-                placeholder="Select UoM"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <UnitSelector
+                  value={formData.unit_id}
+                  onChange={(value) => setFormData({ ...formData, unit_id: value })}
+                  categoryFilter="Quantity"
+                  placeholder="Select unit"
+                  className="flex-1"
+                />
+                {formData.unit_id > 0 && (
+                  <InlineConverter
+                    value={1}
+                    fromUnitId={formData.unit_id}
+                    categoryName="Quantity"
+                  />
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="consumable_flag">Consumable</Label>
@@ -1792,7 +1881,7 @@ function AccessoriesDialog({
     product_name: "",
     category: "",
     sub_category: "",
-    uom: "",
+    unit_id: 0,
     consumable_flag: "none" as "yes" | "no" | "none",
     remarks: "",
   });
@@ -1843,7 +1932,7 @@ function AccessoriesDialog({
         product_name: editingAccessories.product_name || "",
         category: editingCategory,
         sub_category: editingAccessories.sub_category || "",
-        uom: editingAccessories.uom || "",
+        unit_id: editingAccessories.unit_id || 0,
         consumable_flag: consumableValue,
         remarks: editingAccessories.remarks || "",
       });
@@ -1853,7 +1942,7 @@ function AccessoriesDialog({
         product_name: "",
         category: "",
         sub_category: "",
-        uom: "",
+        unit_id: 0,
         consumable_flag: "none",
         remarks: "",
       });
@@ -1862,6 +1951,13 @@ function AccessoriesDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate unit selection
+    if (!formData.unit_id || formData.unit_id === 0) {
+      toast.error("Please select a unit");
+      return;
+    }
+    
     onSubmit(formData);
   };
 
@@ -2006,16 +2102,25 @@ function AccessoriesDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="uom">
-                UoM <span className="text-destructive">*</span>
+              <Label htmlFor="unit_id">
+                Unit <span className="text-destructive">*</span>
               </Label>
-              <UoMSelector
-                value={formData.uom}
-                onChange={(value) => setFormData({ ...formData, uom: value })}
-                categoryFilter={["Quantity"]}
-                placeholder="Select UoM"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <UnitSelector
+                  value={formData.unit_id}
+                  onChange={(value) => setFormData({ ...formData, unit_id: value })}
+                  categoryFilter="Quantity"
+                  placeholder="Select unit"
+                  className="flex-1"
+                />
+                {formData.unit_id > 0 && (
+                  <InlineConverter
+                    value={1}
+                    fromUnitId={formData.unit_id}
+                    categoryName="Quantity"
+                  />
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="consumable_flag">Consumable</Label>
@@ -2088,7 +2193,7 @@ function FinishedGoodDialog({
     product_name: "",
     category: "",
     sub_category: "",
-    uom: "",
+    unit_id: 0,
     consumable_flag: "none" as "yes" | "no" | "none",
     remarks: "",
   });
@@ -2117,7 +2222,7 @@ function FinishedGoodDialog({
         product_name: editingFinishedGood.product_name || "",
         category: editingFinishedGood.category || "",
         sub_category: editingFinishedGood.sub_category || "",
-        uom: editingFinishedGood.uom || "",
+        unit_id: editingFinishedGood.unit_id || 0,
         consumable_flag: consumableValue,
         remarks: editingFinishedGood.remarks || "",
       });
@@ -2127,7 +2232,7 @@ function FinishedGoodDialog({
         product_name: "",
         category: "",
         sub_category: "",
-        uom: "",
+        unit_id: 0,
         consumable_flag: "none",
         remarks: "",
       });
@@ -2136,6 +2241,13 @@ function FinishedGoodDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate unit selection
+    if (!formData.unit_id || formData.unit_id === 0) {
+      toast.error("Please select a unit");
+      return;
+    }
+    
     onSubmit(formData);
   };
 
@@ -2204,16 +2316,25 @@ function FinishedGoodDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="uom">
-                UoM <span className="text-destructive">*</span>
+              <Label htmlFor="unit_id">
+                Unit <span className="text-destructive">*</span>
               </Label>
-              <UoMSelector
-                value={formData.uom}
-                onChange={(value) => setFormData({ ...formData, uom: value })}
-                categoryFilter={["Quantity"]}
-                placeholder="Select UoM"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <UnitSelector
+                  value={formData.unit_id}
+                  onChange={(value) => setFormData({ ...formData, unit_id: value })}
+                  categoryFilter="Quantity"
+                  placeholder="Select unit"
+                  className="flex-1"
+                />
+                {formData.unit_id > 0 && (
+                  <InlineConverter
+                    value={1}
+                    fromUnitId={formData.unit_id}
+                    categoryName="Quantity"
+                  />
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="consumable_flag">Consumable</Label>
@@ -2286,7 +2407,7 @@ function PackingGoodDialog({
     product_name: "",
     category: "",
     sub_category: "",
-    uom: "",
+    unit_id: 0,
     consumable_flag: "none" as "yes" | "no" | "none",
     carton_length: "",
     carton_width: "",
@@ -2319,7 +2440,7 @@ function PackingGoodDialog({
         product_name: editingPackingGood.product_name || "",
         category: editingPackingGood.category || "",
         sub_category: editingPackingGood.sub_category || "",
-        uom: editingPackingGood.uom || "",
+        unit_id: editingPackingGood.unit_id || 0,
         consumable_flag: consumableValue,
         carton_length: editingPackingGood.carton_length?.toString() || "",
         carton_width: editingPackingGood.carton_width?.toString() || "",
@@ -2333,7 +2454,7 @@ function PackingGoodDialog({
         product_name: "",
         category: "",
         sub_category: "",
-        uom: "",
+        unit_id: 0,
         consumable_flag: "none",
         carton_length: "",
         carton_width: "",
@@ -2346,6 +2467,13 @@ function PackingGoodDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate unit selection
+    if (!formData.unit_id || formData.unit_id === 0) {
+      toast.error("Please select a unit");
+      return;
+    }
+    
     onSubmit(formData);
   };
 
@@ -2413,16 +2541,25 @@ function PackingGoodDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="uom">
-                UoM <span className="text-destructive">*</span>
+              <Label htmlFor="unit_id">
+                Unit <span className="text-destructive">*</span>
               </Label>
-              <UoMSelector
-                value={formData.uom}
-                onChange={(value) => setFormData({ ...formData, uom: value })}
-                categoryFilter={["Quantity", "Packaging"]}
-                placeholder="Select UoM"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <UnitSelector
+                  value={formData.unit_id}
+                  onChange={(value) => setFormData({ ...formData, unit_id: value })}
+                  categoryFilter="Quantity"
+                  placeholder="Select unit"
+                  className="flex-1"
+                />
+                {formData.unit_id > 0 && (
+                  <InlineConverter
+                    value={1}
+                    fromUnitId={formData.unit_id}
+                    categoryName="Quantity"
+                  />
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="consumable_flag">Consumable</Label>

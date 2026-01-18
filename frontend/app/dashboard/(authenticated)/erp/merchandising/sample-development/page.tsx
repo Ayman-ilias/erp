@@ -966,9 +966,9 @@ function SamplePrimaryDialog({
       trims_handover_date: formData.trims_handover_date ? new Date(formData.trims_handover_date).toISOString() : null,
       required_date: formData.required_date ? new Date(formData.required_date).toISOString() : null,
       request_pcs: formData.request_pcs ? parseInt(formData.request_pcs) : null,
-      // Convert additional_instruction string to array of objects (backend expects List[Dict])
+      // Convert additional_instruction string to array (backend expects List[str])
       additional_instruction: formData.additional_instruction
-        ? [{ instruction: formData.additional_instruction, done: false }]
+        ? [formData.additional_instruction]
         : null,
       // Convert techpack fields to array (backend expects List[Dict])
       techpack_files: formData.techpack_url

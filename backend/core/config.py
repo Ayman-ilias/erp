@@ -16,20 +16,24 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
 
     # Multi-Database Host Configuration
-    POSTGRES_HOST_CLIENTS: str = "db-clients"
-    POSTGRES_HOST_SAMPLES: str = "db-samples"
-    POSTGRES_HOST_USERS: str = "db-users"
-    POSTGRES_HOST_ORDERS: str = "db-orders"
-    POSTGRES_HOST_MERCHANDISER: str = "db-merchandiser"
-    POSTGRES_HOST_SETTINGS: str = "db-settings"
+    POSTGRES_HOST_CLIENTS: str = os.getenv("POSTGRES_HOST_CLIENTS", "db-clients")
+    POSTGRES_HOST_SAMPLES: str = os.getenv("POSTGRES_HOST_SAMPLES", "db-samples")
+    POSTGRES_HOST_USERS: str = os.getenv("POSTGRES_HOST_USERS", "db-users")
+    POSTGRES_HOST_ORDERS: str = os.getenv("POSTGRES_HOST_ORDERS", "db-orders")
+    POSTGRES_HOST_MERCHANDISER: str = os.getenv("POSTGRES_HOST_MERCHANDISER", "db-merchandiser")
+    POSTGRES_HOST_SETTINGS: str = os.getenv("POSTGRES_HOST_SETTINGS", "db-settings")
+    POSTGRES_HOST_UNITS: str = os.getenv("POSTGRES_HOST_UNITS", "db-units")
+    POSTGRES_HOST_SIZECOLOR: str = os.getenv("POSTGRES_HOST_SIZECOLOR", "db-sizecolor")
 
     # Multi-Database Names
-    POSTGRES_DB_CLIENTS: str = "rmg_erp_clients"
-    POSTGRES_DB_SAMPLES: str = "rmg_erp_samples"
-    POSTGRES_DB_USERS: str = "rmg_erp_users"
-    POSTGRES_DB_ORDERS: str = "rmg_erp_orders"
-    POSTGRES_DB_MERCHANDISER: str = "rmg_erp_merchandiser"
-    POSTGRES_DB_SETTINGS: str = "rmg_erp_settings"
+    POSTGRES_DB_CLIENTS: str = os.getenv("POSTGRES_DB_CLIENTS", "rmg_erp_clients")
+    POSTGRES_DB_SAMPLES: str = os.getenv("POSTGRES_DB_SAMPLES", "rmg_erp_samples")
+    POSTGRES_DB_USERS: str = os.getenv("POSTGRES_DB_USERS", "rmg_erp_users")
+    POSTGRES_DB_ORDERS: str = os.getenv("POSTGRES_DB_ORDERS", "rmg_erp_orders")
+    POSTGRES_DB_MERCHANDISER: str = os.getenv("POSTGRES_DB_MERCHANDISER", "rmg_erp_merchandiser")
+    POSTGRES_DB_SETTINGS: str = os.getenv("POSTGRES_DB_SETTINGS", "rmg_erp_settings")
+    POSTGRES_DB_UNITS: str = os.getenv("POSTGRES_DB_UNITS", "rmg_erp_units")
+    POSTGRES_DB_SIZECOLOR: str = os.getenv("POSTGRES_DB_SIZECOLOR", "rmg_erp_sizecolor")
 
     # Legacy single DB (for backward compatibility)
     POSTGRES_HOST: str = "db-samples"
@@ -43,6 +47,8 @@ class Settings(BaseSettings):
     DATABASE_URL_ORDERS: Optional[str] = None
     DATABASE_URL_MERCHANDISER: Optional[str] = None
     DATABASE_URL_SETTINGS: Optional[str] = None
+    DATABASE_URL_UNITS: Optional[str] = None
+    DATABASE_URL_SIZECOLOR: Optional[str] = None
 
     # JWT Settings - SECRET_KEY must be set via environment variable in production
     # Generate a secure key: python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -89,6 +95,8 @@ class Settings(BaseSettings):
         self.DATABASE_URL_ORDERS = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST_ORDERS}:{self.POSTGRES_PORT}/{self.POSTGRES_DB_ORDERS}"
         self.DATABASE_URL_MERCHANDISER = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST_MERCHANDISER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB_MERCHANDISER}"
         self.DATABASE_URL_SETTINGS = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST_SETTINGS}:{self.POSTGRES_PORT}/{self.POSTGRES_DB_SETTINGS}"
+        self.DATABASE_URL_UNITS = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST_UNITS}:{self.POSTGRES_PORT}/{self.POSTGRES_DB_UNITS}"
+        self.DATABASE_URL_SIZECOLOR = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST_SIZECOLOR}:{self.POSTGRES_PORT}/{self.POSTGRES_DB_SIZECOLOR}"
 
         # Legacy DATABASE_URL defaults to samples
         if not self.DATABASE_URL:

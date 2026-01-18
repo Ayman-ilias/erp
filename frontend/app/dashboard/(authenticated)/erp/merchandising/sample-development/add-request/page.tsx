@@ -23,18 +23,34 @@ import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ColorSelector, type SelectedColor } from "@/components/sizecolor/ColorSelector";
+import { SizeSelector, type SelectedSize } from "@/components/sizecolor/SizeSelector";
 
-const SAMPLE_CATEGORIES = ["Proto", "Fit", "PP", "SMS", "TOP", "Salesman", "Photo Shoot", "Production"];
+const DEFAULT_SAMPLE_CATEGORIES = ["Proto", "Fit", "PP", "SMS", "TOP", "Salesman", "Photo Shoot", "Production"];
+
+// Multi-step form wizard steps
+const WIZARD_STEPS = [
+  { id: 1, name: "Basic Info", description: "Buyer, Sample Name, Category" },
+  { id: 2, name: "Specifications", description: "Gauge, PLY, Colors, Sizes" },
+  { id: 3, name: "Materials", description: "Yarn, Trims & Details" },
+  { id: 4, name: "Dates", description: "Handover & Required Dates" },
+  { id: 5, name: "Additional", description: "Decorative Parts & Instructions" },
+  { id: 6, name: "Files", description: "Techpack & Attachments" },
+  { id: 7, name: "Review", description: "Preview & Submit" },
+];
 
 export default function AddSampleRequestPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
-  
+
   // Check if we're editing (via URL query param)
   const editSampleId = searchParams.get("edit");
   const [isEditing, setIsEditing] = useState(false);
+
+  // Wizard state
+  const [currentStep, setCurrentStep] = useState(1);
 
   // Fetch required data
   const { data: buyersData } = useQuery({
@@ -75,53 +91,8 @@ export default function AddSampleRequestPage() {
     },
   });
 
-  const { data: colorsData } = useQuery({
-    queryKey: ["colors"],
-    queryFn: async () => {
-      try {
-        const response = await fetch('/api/v1/color-master/colors');
-        if (!response.ok) return [];
-        return await response.json();
-      } catch (error) {
-        console.error('Failed to fetch colors:', error);
-        return [];
-      }
-    },
-  });
-
-  const { data: sizesData } = useQuery({
-    queryKey: ["size-charts"],
-    queryFn: async () => {
-      try {
-        // Fetch all size charts from size_chart_master with full details
-        const response = await fetch('/api/v1/size-charts');
-        if (!response.ok) return [];
-        const data = await response.json();
-        // Extract unique sizes with their auto_generated_id (size_id) and all details
-        const uniqueSizes = new Map();
-        data.forEach((chart: any) => {
-          if (chart.auto_generated_id && chart.size_name) {
-            // Use auto_generated_id as the unique key and size_id
-            uniqueSizes.set(chart.auto_generated_id, {
-              id: chart.id,
-              size_name: chart.size_name,
-              size_id: chart.auto_generated_id, // Use auto_generated_id as size_id
-              auto_generated_id: chart.auto_generated_id,
-              profile_name: chart.profile_name || '',
-              product_type_name: chart.product_type_name || '',
-              gender: chart.gender || '',
-              measurements: chart.measurements || {},
-              size_order: chart.size_order || 0
-            });
-          }
-        });
-        return Array.from(uniqueSizes.values());
-      } catch (error) {
-        console.error('Failed to fetch sizes:', error);
-        return [];
-      }
-    },
-  });
+  // Note: Colors and Sizes are now fetched by the ColorSelector and SizeSelector components
+  // using the new sizecolor hooks (useUniversalColorsForSelector, useHMColorsForSelector, useSizesForSelector)
 
   // Fetch all samples to find the one we're editing
   const { data: allSamplesData } = useQuery({
@@ -148,6 +119,8 @@ export default function AddSampleRequestPage() {
   useEffect(() => {
     if (sampleData && editSampleId) {
       setIsEditing(true);
+      // Start on review page when editing
+      setCurrentStep(7);
       // Parse additional_instruction if it's a string (from sync)
       let additionalInstructions = [];
       if (sampleData.additional_instruction) {
@@ -214,7 +187,7 @@ export default function AddSampleRequestPage() {
     sample_name: "",
     item: "",
     gauge: "",
-    ply: "",
+    ply: "" as string | number,
     sample_category: "Proto",
     priority: "normal" as string,
     yarn_ids: [] as string[],
@@ -225,10 +198,10 @@ export default function AddSampleRequestPage() {
     trims_ids: [] as string[],
     trims_details: "",
     decorative_part: [] as string[],  // Array of decorative parts
-    color_ids: [] as number[],  // Array of color IDs
+    color_ids: [] as number[],  // Array of color IDs (legacy)
     color_name: "",
-    size_ids: [] as string[],  // Array of size IDs (auto_generated_id)
-    size_names: [] as string[],  // Array of size names for display
+    size_ids: [] as string[],  // Array of size IDs (legacy)
+    size_names: [] as string[],  // Array of size names for display (legacy)
     yarn_handover_date: "",
     trims_handover_date: "",
     required_date: "",
@@ -236,6 +209,10 @@ export default function AddSampleRequestPage() {
     additional_instruction: [] as Array<{instruction: string, done: boolean}>,  // Array of instructions with status
     techpack_files: [] as Array<{url: string, filename: string, type: string}>,  // Array of techpack files
   });
+
+  // New color and size selection state using the redesigned components
+  const [selectedColors, setSelectedColors] = useState<SelectedColor[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<SelectedSize[]>([]);
 
   const [buyerOpen, setBuyerOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");
@@ -250,9 +227,12 @@ export default function AddSampleRequestPage() {
   const [gaugeSearch, setGaugeSearch] = useState("");
   const [gauges, setGauges] = useState<string[]>(["12", "14", "16", "18", "20", "22", "24", "7", "10", "12,5", "14,5"]);
 
-  // Color, Size, Yarn, and Trims dropdown state
-  const [colorOpen, setColorOpen] = useState(false);
-  const [sizeOpen, setSizeOpen] = useState(false);
+  // Category dropdown state
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categories, setCategories] = useState<string[]>(DEFAULT_SAMPLE_CATEGORIES);
+
+  // Yarn and Trims dropdown state (Colors and Sizes now use dedicated selector components)
   const [yarnOpen, setYarnOpen] = useState(false);
   const [trimsOpen, setTrimsOpen] = useState(false);
 
@@ -261,6 +241,7 @@ export default function AddSampleRequestPage() {
     mutationFn: (data: any) => api.merchandiser.samplePrimary.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["merchandiser", "samplePrimary"] });
+      queryClient.invalidateQueries({ queryKey: ["samples", "requests"] });
       toast.success("Sample request created successfully");
       
       // Close this tab and navigate parent window back
@@ -271,8 +252,7 @@ export default function AddSampleRequestPage() {
         } catch (e) {
           // Ignore if postMessage fails
         }
-        // Navigate parent window back to sample development page (will trigger refresh)
-        window.opener.location.href = "/dashboard/erp/merchandising/sample-development";
+        // Close this window - parent will refresh via postMessage
         window.close();
       } else {
         // If not opened from another window, just navigate back
@@ -301,8 +281,7 @@ export default function AddSampleRequestPage() {
         } catch (e) {
           // Ignore if postMessage fails
         }
-        // Navigate parent window back to sample development page (will trigger refresh)
-        window.opener.location.href = "/dashboard/erp/merchandising/sample-development";
+        // Close this window - parent will refresh via postMessage
         window.close();
       } else {
         // If not opened from another window, just navigate back
@@ -404,6 +383,29 @@ export default function AddSampleRequestPage() {
     );
   }, [gauges, gaugeSearch]);
 
+  const handleCategorySelect = (category: string) => {
+    setFormData({ ...formData, sample_category: category });
+    setCategoryOpen(false);
+    setCategorySearch("");
+  };
+
+  const handleAddNewCategory = () => {
+    const newCategory = categorySearch.trim();
+    if (newCategory && !categories.includes(newCategory)) {
+      setCategories([...categories, newCategory]);
+      setFormData({ ...formData, sample_category: newCategory });
+      setCategoryOpen(false);
+      setCategorySearch("");
+    }
+  };
+
+  const filteredCategories = useMemo(() => {
+    if (!categorySearch) return categories;
+    return categories.filter((category) =>
+      category.toLowerCase().includes(categorySearch.toLowerCase())
+    );
+  }, [categories, categorySearch]);
+
   // Handlers for multiple decorative parts
   const [newDecorativePart, setNewDecorativePart] = useState("");
   const addDecorativePart = () => {
@@ -473,25 +475,59 @@ export default function AddSampleRequestPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prepare data for backend
     const submitData: any = {
       ...formData,
       buyer_id: parseInt(formData.buyer_id),
       request_pcs: formData.request_pcs ? parseInt(formData.request_pcs) : null,
+      // ply must be string or null (not integer)
+      ply: formData.ply && String(formData.ply).trim() !== "" ? String(formData.ply).trim() : null,
       // Convert date strings to ISO format or null
       yarn_handover_date: formData.yarn_handover_date ? new Date(formData.yarn_handover_date).toISOString() : null,
       trims_handover_date: formData.trims_handover_date ? new Date(formData.trims_handover_date).toISOString() : null,
       required_date: formData.required_date ? new Date(formData.required_date).toISOString() : null,
-      // Ensure arrays are included (even if empty, backend expects arrays)
-      decorative_part: formData.decorative_part || [],
-      additional_instruction: formData.additional_instruction || [],
-      techpack_files: formData.techpack_files || [],
-      // Set size_id from size_ids array (use first one for backward compatibility)
-      size_id: formData.size_ids && formData.size_ids.length > 0 ? formData.size_ids[0] : null,
-      size_name: formData.size_names && formData.size_names.length > 0 ? formData.size_names.join(', ') : null,
+      // Keep arrays as arrays for backend (backend expects List[str] and List[Dict])
+      decorative_part: Array.isArray(formData.decorative_part) && formData.decorative_part.length > 0
+        ? formData.decorative_part
+        : null,
+      additional_instruction: Array.isArray(formData.additional_instruction) && formData.additional_instruction.length > 0
+        ? formData.additional_instruction
+        : null,
+      techpack_files: formData.techpack_files && formData.techpack_files.length > 0 ? formData.techpack_files : null,
+
+      // New color selection data from ColorSelector component
+      // Format: array of { id, type, code, name, hex_code, display_name }
+      selected_colors: selectedColors.length > 0 ? selectedColors.map(c => ({
+        color_id: c.id,
+        color_type: c.type,  // "universal" or "hm"
+        color_code: c.code,
+        color_name: c.name,
+        hex_code: c.hex_code,
+      })) : null,
+
+      // Legacy color_ids for backward compatibility (extract universal color IDs)
+      color_ids: selectedColors.filter(c => c.type === "universal").map(c => c.id),
+      color_name: selectedColors.map(c => c.name).join(", ") || null,
+
+      // New size selection data from SizeSelector component
+      // Format: array of { id, size_code, size_name, garment_type_name, gender, age_group, fit_type }
+      selected_sizes: selectedSizes.length > 0 ? selectedSizes.map(s => ({
+        size_id: s.id,
+        size_code: s.size_code,
+        size_name: s.size_name,
+        garment_type_name: s.garment_type_name,
+        gender: s.gender,
+        age_group: s.age_group,
+        fit_type: s.fit_type,
+      })) : null,
+
+      // Legacy size_id and size_name for backward compatibility
+      size_id: selectedSizes.length > 0 ? selectedSizes[0].size_code : null,
+      size_ids: selectedSizes.map(s => s.size_code),
+      size_name: selectedSizes.map(s => s.size_name).join(", ") || null,
     };
-    
+
     // Set yarn_id from yarn_ids array if not set (for backward compatibility)
     if (!submitData.yarn_id && submitData.yarn_ids && submitData.yarn_ids.length > 0) {
       submitData.yarn_id = submitData.yarn_ids[0];
@@ -500,14 +536,11 @@ export default function AddSampleRequestPage() {
     if (!submitData.yarn_ids || !Array.isArray(submitData.yarn_ids)) {
       submitData.yarn_ids = submitData.yarn_id ? [submitData.yarn_id] : [];
     }
-    
-    // Remove size_names from submit (not needed by backend)
-    delete submitData.size_names;
-    
-    // For updates, exclude sample_id (it shouldn't change)
-    if (isEditing && editSampleId) {
+
+    // For updates, exclude sample_id (it shouldn't change) and use sample_id as identifier
+    if (isEditing && sampleData?.sample_id) {
       delete submitData.sample_id;
-      updatePrimaryMutation.mutate({ id: editSampleId, data: submitData });
+      updatePrimaryMutation.mutate({ id: sampleData.sample_id, data: submitData });
     } else {
       // Only include sample_id if it's not empty (backend will auto-generate if empty)
       if (!formData.sample_id || formData.sample_id.trim() === "") {
@@ -519,9 +552,78 @@ export default function AddSampleRequestPage() {
 
   const selectedBuyer = buyersData?.find((b: any) => b.id.toString() === formData.buyer_id);
 
+  // Navigation handlers
+  const goToNextStep = () => {
+    if (currentStep < WIZARD_STEPS.length) {
+      setCurrentStep(currentStep + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToPreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToStep = (step: number) => {
+    setCurrentStep(step);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Progress Tracker Component
+  const ProgressTracker = () => (
+    <div className="bg-white border rounded-lg p-6 mb-6 shadow-sm">
+      <div className="flex items-center justify-between">
+        {WIZARD_STEPS.map((step, index) => {
+          // In edit mode, show all steps as completed (green) except current
+          const isCompleted = isEditing ? step.id !== currentStep : currentStep > step.id;
+          const isCurrent = currentStep === step.id;
+
+          return (
+            <div key={step.id} className="flex items-center flex-1">
+              <div className="flex flex-col items-center flex-1">
+                <button
+                  onClick={() => goToStep(step.id)}
+                  disabled={!isEditing && step.id > currentStep}
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all",
+                    isCurrent
+                      ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
+                      : isCompleted
+                      ? "bg-green-500 text-white cursor-pointer hover:bg-green-600"
+                      : "bg-muted text-muted-foreground cursor-not-allowed"
+                  )}
+                >
+                  {isCompleted ? <Check className="h-5 w-5" /> : step.id}
+                </button>
+                <div className="text-center mt-2">
+                  <div className={cn(
+                    "text-sm font-medium",
+                    isCurrent ? "text-primary" : "text-muted-foreground"
+                  )}>
+                    {step.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{step.description}</div>
+                </div>
+              </div>
+              {index < WIZARD_STEPS.length - 1 && (
+                <div className={cn(
+                  "h-1 flex-1 mx-2 rounded transition-all",
+                  isCompleted ? "bg-green-500" : "bg-muted"
+                )} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="container mx-auto py-6 px-4 max-w-[1600px]">
-      <div className="mb-6">
+    <div className="min-h-screen bg-muted/30 py-8">
+      <div className="container mx-auto px-6 max-w-[1800px]">
         <Button
           variant="ghost"
           onClick={() => {
@@ -531,516 +633,509 @@ export default function AddSampleRequestPage() {
               router.push("/dashboard/erp/merchandising/sample-development");
             }
           }}
-          className="mb-4"
+          className="mb-6"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          Back to Sample Development
         </Button>
-        <Card>
-          <CardHeader>
-            <CardTitle>{isEditing ? "Edit Sample Request" : "Create New Sample Request"}</CardTitle>
-            <CardDescription>
-              {isEditing 
-                ? "Update the sample request details below"
-                : "Fill in the details to create a new sample request. Sample ID will be auto-generated if left empty."}
+
+        <ProgressTracker />
+
+        <Card className="shadow-lg">
+          <CardHeader className="border-b bg-card">
+            <CardTitle className="text-2xl">
+              {isEditing ? "Edit Sample Request" : "Create New Sample Request"}
+            </CardTitle>
+            <CardDescription className="text-base">
+              Step {currentStep} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep - 1].name}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Row 1: Buyer, Sample Name, Item, Category, Priority, Gauge, PLY, Colors, Sizes - 9 columns */}
-              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(9, minmax(0, 1fr))' }}>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Buyer *</Label>
-                  <Popover open={buyerOpen} onOpenChange={setBuyerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" aria-expanded={buyerOpen} className="w-full justify-between h-10 text-sm">
-                        {selectedBuyer ? (selectedBuyer.buyer_name || selectedBuyer.brand_name) : "Select..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[350px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search buyer..." value={buyerSearch} onValueChange={setBuyerSearch} />
-                        <CommandList>
-                          <CommandEmpty>No buyer found.</CommandEmpty>
-                          <CommandGroup>
-                            {filteredBuyers.map((b: any) => (
-                              <CommandItem key={b.id} value={b.id.toString()} onSelect={() => handleBuyerSelect(b.id.toString())}>
-                                <Check className={cn("mr-2 h-4 w-4", formData.buyer_id === b.id.toString() ? "opacity-100" : "opacity-0")} />
-                                {b.buyer_name || b.brand_name} {b.company_name ? `- ${b.company_name}` : ""}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sample Name *</Label>
-                  <Input className="h-10" value={formData.sample_name} onChange={(e) => setFormData({ ...formData, sample_name: e.target.value })} required />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Item</Label>
-                  <Popover open={itemOpen} onOpenChange={setItemOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" aria-expanded={itemOpen} className="w-full justify-between h-10 text-sm">
-                        {formData.item || "Select item..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput 
-                          placeholder="Search or add item..." 
-                          value={itemSearch} 
-                          onValueChange={setItemSearch}
-                        />
-                        <CommandList>
-                          <CommandEmpty>
-                            {itemSearch ? (
-                              <div className="py-2">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="w-full justify-start"
-                                  onClick={handleAddNewItem}
+          <CardContent className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Step 1: Basic Information */}
+              {currentStep === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Basic Information</h3>
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Buyer *</Label>
+                    <Popover open={buyerOpen} onOpenChange={setBuyerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={buyerOpen} className="w-full justify-between h-11">
+                          {selectedBuyer ? (selectedBuyer.buyer_name || selectedBuyer.brand_name) : "Select buyer..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[350px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search buyer..." value={buyerSearch} onValueChange={setBuyerSearch} />
+                          <CommandList>
+                            <CommandEmpty>No buyer found.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredBuyers.map((b: any) => (
+                                <CommandItem key={b.id} value={b.id.toString()} onSelect={() => handleBuyerSelect(b.id.toString())}>
+                                  <Check className={cn("mr-2 h-4 w-4", formData.buyer_id === b.id.toString() ? "opacity-100" : "opacity-0")} />
+                                  {b.buyer_name || b.brand_name} {b.company_name ? `- ${b.company_name}` : ""}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Sample Name *</Label>
+                    <Input className="h-11" value={formData.sample_name} onChange={(e) => setFormData({ ...formData, sample_name: e.target.value })} required placeholder="Enter sample name" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Item</Label>
+                    <Popover open={itemOpen} onOpenChange={setItemOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={itemOpen} className="w-full justify-between h-11">
+                          {formData.item || "Select item..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search or add item..."
+                            value={itemSearch}
+                            onValueChange={setItemSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {itemSearch ? (
+                                <div className="py-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full justify-start"
+                                    onClick={handleAddNewItem}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add "{itemSearch}"
+                                  </Button>
+                                </div>
+                              ) : (
+                                "No item found."
+                              )}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {filteredItems.map((item) => (
+                                <CommandItem
+                                  key={item}
+                                  value={item}
+                                  onSelect={() => handleItemSelect(item)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.item === item ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {item}
+                                </CommandItem>
+                              ))}
+                              {itemSearch && !filteredItems.includes(itemSearch) && (
+                                <CommandItem
+                                  value={`add-${itemSearch}`}
+                                  onSelect={handleAddNewItem}
+                                  className="text-primary"
                                 >
                                   <Plus className="mr-2 h-4 w-4" />
                                   Add "{itemSearch}"
-                                </Button>
-                              </div>
-                            ) : (
-                              "No item found."
-                            )}
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {filteredItems.map((item) => (
-                              <CommandItem
-                                key={item}
-                                value={item}
-                                onSelect={() => handleItemSelect(item)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    formData.item === item ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {item}
-                              </CommandItem>
-                            ))}
-                            {itemSearch && !filteredItems.includes(itemSearch) && (
-                              <CommandItem
-                                value={`add-${itemSearch}`}
-                                onSelect={handleAddNewItem}
-                                className="text-primary"
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add "{itemSearch}"
-                              </CommandItem>
-                            )}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                                </CommandItem>
+                              )}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Category *</Label>
-                  <Select value={formData.sample_category} onValueChange={(v) => setFormData({ ...formData, sample_category: v })}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {SAMPLE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Category *</Label>
+                    <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={categoryOpen} className="w-full justify-between h-11">
+                          {formData.sample_category || "Select category..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search or add category..."
+                            value={categorySearch}
+                            onValueChange={setCategorySearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {categorySearch ? (
+                                <div className="py-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full justify-start"
+                                    onClick={handleAddNewCategory}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add "{categorySearch}"
+                                  </Button>
+                                </div>
+                              ) : (
+                                "No category found."
+                              )}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {filteredCategories.map((category) => (
+                                <CommandItem
+                                  key={category}
+                                  value={category}
+                                  onSelect={() => handleCategorySelect(category)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.sample_category === category ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {category}
+                                </CommandItem>
+                              ))}
+                              {categorySearch && !filteredCategories.some(c => c.toLowerCase() === categorySearch.toLowerCase()) && (
+                                <CommandItem
+                                  value={`add-${categorySearch}`}
+                                  onSelect={handleAddNewCategory}
+                                  className="text-primary"
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Add "{categorySearch}"
+                                </CommandItem>
+                              )}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Priority *</Label>
+                    <Select value={formData.priority} onValueChange={(v) => setFormData({ ...formData, priority: v })}>
+                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="urgent">Urgent - Instant Needed</SelectItem>
+                        <SelectItem value="high">High Priority</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="low">Low Priority</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Request Pieces</Label>
+                    <Input className="h-11" type="number" value={formData.request_pcs} onChange={(e) => setFormData({ ...formData, request_pcs: e.target.value })} placeholder="Enter quantity" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Priority *</Label>
-                  <Select value={formData.priority} onValueChange={(v) => setFormData({ ...formData, priority: v })}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="urgent">Urgent - Instant Needed</SelectItem>
-                      <SelectItem value="high">High Priority</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="low">Low Priority</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Gauge</Label>
-                  <Popover open={gaugeOpen} onOpenChange={setGaugeOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" aria-expanded={gaugeOpen} className="w-full justify-between h-10 text-sm">
-                        {formatGaugeForDisplay(formData.gauge) || "Select gauge..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput 
-                          placeholder="Search or add gauge (e.g., 12 or 12,5)..." 
-                          value={gaugeSearch} 
-                          onValueChange={setGaugeSearch}
-                        />
-                        <CommandList>
-                          <CommandEmpty>
-                            {gaugeSearch ? (
-                              <div className="py-2">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="w-full justify-start"
-                                  onClick={handleAddNewGauge}
+              </div>
+              )}
+
+              {/* Step 2: Specifications */}
+              {currentStep === 2 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Specifications</h3>
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Gauge</Label>
+                    <Popover open={gaugeOpen} onOpenChange={setGaugeOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={gaugeOpen} className="w-full justify-between h-11">
+                          {formatGaugeForDisplay(formData.gauge) || "Select gauge..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search or add gauge (e.g., 12 or 12,5)..."
+                            value={gaugeSearch}
+                            onValueChange={setGaugeSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {gaugeSearch ? (
+                                <div className="py-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full justify-start"
+                                    onClick={handleAddNewGauge}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add "{gaugeSearch}"
+                                  </Button>
+                                </div>
+                              ) : (
+                                "No gauge found."
+                              )}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {filteredGauges.map((gauge) => (
+                                <CommandItem
+                                  key={gauge}
+                                  value={gauge}
+                                  onSelect={() => handleGaugeSelect(gauge)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formatGaugeForDisplay(formData.gauge) === gauge ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {gauge}
+                                </CommandItem>
+                              ))}
+                              {gaugeSearch && !filteredGauges.some(g => g.toLowerCase() === gaugeSearch.toLowerCase()) && (
+                                <CommandItem
+                                  value={`add-${gaugeSearch}`}
+                                  onSelect={handleAddNewGauge}
+                                  className="text-primary"
                                 >
                                   <Plus className="mr-2 h-4 w-4" />
                                   Add "{gaugeSearch}"
-                                </Button>
-                              </div>
-                            ) : (
-                              "No gauge found."
-                            )}
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {filteredGauges.map((gauge) => (
-                              <CommandItem
-                                key={gauge}
-                                value={gauge}
-                                onSelect={() => handleGaugeSelect(gauge)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    formatGaugeForDisplay(formData.gauge) === gauge ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {gauge}
-                              </CommandItem>
-                            ))}
-                            {gaugeSearch && !filteredGauges.some(g => g.toLowerCase() === gaugeSearch.toLowerCase()) && (
-                              <CommandItem
-                                value={`add-${gaugeSearch}`}
-                                onSelect={handleAddNewGauge}
-                                className="text-primary"
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add "{gaugeSearch}"
-                              </CommandItem>
-                            )}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                                </CommandItem>
+                              )}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">PLY</Label>
+                    <Input className="h-11" type="number" value={formData.ply} onChange={(e) => setFormData({ ...formData, ply: e.target.value })} placeholder="Enter PLY (e.g., 2)" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Colors</Label>
+                    <ColorSelector
+                      selectedColors={selectedColors}
+                      onColorsChange={setSelectedColors}
+                      maxSelections={10}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">PLY</Label>
-                  <Input className="h-10" type="number" value={formData.ply} onChange={(e) => setFormData({ ...formData, ply: e.target.value })} placeholder="2" />
+
+                <div className="grid grid-cols-1 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Sizes</Label>
+                    <SizeSelector
+                      selectedSizes={selectedSizes}
+                      onSizesChange={setSelectedSizes}
+                      maxSelections={20}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Colors</Label>
-                  <Popover open={colorOpen} onOpenChange={setColorOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="w-full justify-between h-10 text-sm">
-                        {formData.color_ids.length > 0 
-                          ? `${formData.color_ids.length} color(s) selected`
-                          : "Select colors..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search colors..." />
-                        <CommandEmpty>No colors found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {(colorsData || []).map((color: any) => (
-                              <CommandItem
-                                key={color.id}
-                                value={color.color_name}
-                                onSelect={() => {
-                                  const isSelected = formData.color_ids.includes(color.id);
-                                  setFormData({
-                                    ...formData,
-                                    color_ids: isSelected
-                                      ? formData.color_ids.filter(id => id !== color.id)
-                                      : [...formData.color_ids, color.id]
-                                  });
-                                }}
-                              >
-                                <div className="flex items-center w-full">
-                                  <Check className={cn("mr-2 h-4 w-4", formData.color_ids.includes(color.id) ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex items-center gap-2 flex-1">
-                                    {color.hex_code && (
-                                      <div 
-                                        className="w-4 h-4 rounded border" 
-                                        style={{ backgroundColor: color.hex_code }}
-                                      />
-                                    )}
-                                    <span className="text-sm">{color.color_name}</span>
-                                  </div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sizes</Label>
-                  <Popover open={sizeOpen} onOpenChange={setSizeOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="w-full justify-between h-10 text-sm">
-                        {formData.size_ids.length > 0 
-                          ? `${formData.size_ids.length} size(s) selected`
-                          : "Select sizes..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[600px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search by size ID, name, profile, or product type..." />
-                        <CommandEmpty>No sizes found.</CommandEmpty>
-                        <CommandList className="max-h-[400px]">
-                          <CommandGroup>
-                            {(sizesData || []).map((size: any) => {
-                              const isSelected = formData.size_ids.includes(size.size_id);
-                              return (
+              </div>
+              )}
+
+              {/* Step 3: Materials */}
+              {currentStep === 3 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Materials</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Yarn ID</Label>
+                    <Popover open={yarnOpen} onOpenChange={setYarnOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" className="w-full justify-between h-11">
+                          {yarnsLoading ? (
+                            "Loading..."
+                          ) : formData.yarn_ids && formData.yarn_ids.length > 0 ? (
+                            `${formData.yarn_ids.length} yarn(s) selected`
+                          ) : (
+                            "Select yarn..."
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search yarns..." />
+                          {yarnsLoading ? (
+                            <CommandList>
+                              <div className="px-2 py-6 text-center text-sm text-muted-foreground">Loading yarns...</div>
+                            </CommandList>
+                          ) : yarnsError ? (
+                            <CommandList>
+                              <div className="px-2 py-6 text-center text-sm text-red-500">Error loading yarns</div>
+                            </CommandList>
+                          ) : (
+                            <>
+                              <CommandEmpty>No yarns found.</CommandEmpty>
+                              <CommandList>
+                                <CommandGroup>
+                                  {(yarnsData || []).map((yarn: any) => {
+                                    const yarnId = yarn.yarn_id;
+                                    const yarnName = yarn.yarn_name || 'No name';
+                                    if (!yarnId) {
+                                      console.warn('[Yarn Render] Yarn without ID:', yarn);
+                                      return null;
+                                    }
+                                    const isSelected = formData.yarn_ids.includes(yarnId);
+                                    return (
+                                      <CommandItem
+                                        key={yarnId}
+                                        value={`${yarnId} ${yarnName}`}
+                                        onSelect={() => {
+                                          setFormData({
+                                            ...formData,
+                                            yarn_ids: isSelected
+                                              ? formData.yarn_ids.filter(id => id !== yarnId)
+                                              : [...formData.yarn_ids, yarnId]
+                                          });
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-medium">{yarnId}</span>
+                                          <span className="text-xs text-muted-foreground">{yarnName}</span>
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              </CommandList>
+                            </>
+                          )}
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Trims</Label>
+                    <Popover open={trimsOpen} onOpenChange={setTrimsOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" className="w-full justify-between h-11">
+                          {formData.trims_ids && formData.trims_ids.length > 0
+                            ? `${formData.trims_ids.length} trim(s) selected`
+                            : "Select trims..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search trims..." />
+                          <CommandEmpty>No trims found.</CommandEmpty>
+                          <CommandList>
+                            <CommandGroup>
+                              {(trimsData || []).map((trim: any) => (
                                 <CommandItem
-                                  key={size.size_id}
-                                  value={`${size.size_id} ${size.size_name} ${size.profile_name || ''} ${size.product_type_name || ''}`}
+                                  key={trim.product_id}
+                                  value={`${trim.product_id} ${trim.product_name}`}
                                   onSelect={() => {
+                                    const isSelected = formData.trims_ids.includes(trim.product_id);
                                     setFormData({
                                       ...formData,
-                                      size_ids: isSelected
-                                        ? formData.size_ids.filter(id => id !== size.size_id)
-                                        : [...formData.size_ids, size.size_id],
-                                      size_names: isSelected
-                                        ? formData.size_names.filter(name => name !== size.size_name)
-                                        : [...formData.size_names, size.size_name]
+                                      trims_ids: isSelected
+                                        ? formData.trims_ids.filter(id => id !== trim.product_id)
+                                        : [...formData.trims_ids, trim.product_id]
                                     });
                                   }}
-                                  className="p-3"
                                 >
-                                  <div className="flex items-start gap-3 w-full">
-                                    <Check className={cn("mt-1 h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-medium">{size.size_id}</span>
-                                        <span className="text-xs text-muted-foreground">({size.size_name})</span>
-                                      </div>
-                                      <div className="text-xs text-muted-foreground space-y-0.5">
-                                        {size.profile_name && (
-                                          <div>Profile: <span className="font-medium">{size.profile_name}</span></div>
-                                        )}
-                                        {size.product_type_name && (
-                                          <div>Product Type: <span className="font-medium">{size.product_type_name}</span></div>
-                                        )}
-                                        {size.gender && (
-                                          <div>Gender: <span className="font-medium">{size.gender}</span></div>
-                                        )}
-                                        {size.measurements && Object.keys(size.measurements).length > 0 && (
-                                          <div className="mt-1">
-                                            <span className="font-medium">Measurements: </span>
-                                            <span className="text-xs">
-                                              {Object.entries(size.measurements).slice(0, 3).map(([key, value]) => (
-                                                <span key={key} className="mr-2">{key}: {String(value)}</span>
-                                              ))}
-                                              {Object.keys(size.measurements).length > 3 && (
-                                                <span className="text-muted-foreground">+{Object.keys(size.measurements).length - 3} more</span>
-                                              )}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
+                                  <Check className={cn("mr-2 h-4 w-4", formData.trims_ids.includes(trim.product_id) ? "opacity-100" : "opacity-0")} />
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">{trim.product_id}</span>
+                                    <span className="text-xs text-muted-foreground">{trim.product_name}</span>
                                   </div>
                                 </CommandItem>
-                              );
-                            })}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Row 2: Request Pcs, Yarn ID, Trims ID, Yarn Handover Date, Trims Handover Date, Required Date - 6 columns */}
-              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Request Pcs</Label>
-                  <Input className="h-10" type="number" value={formData.request_pcs} onChange={(e) => setFormData({ ...formData, request_pcs: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Yarn ID</Label>
-                  <Popover open={yarnOpen} onOpenChange={setYarnOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="w-full justify-between h-10 text-sm">
-                        {yarnsLoading ? (
-                          "Loading..."
-                        ) : formData.yarn_ids && formData.yarn_ids.length > 0 ? (
-                          `${formData.yarn_ids.length} yarn(s) selected`
-                        ) : (
-                          "Select yarn..."
-                        )}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search yarns..." />
-                        {yarnsLoading ? (
-                          <CommandList>
-                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">Loading yarns...</div>
+                              ))}
+                            </CommandGroup>
                           </CommandList>
-                        ) : yarnsError ? (
-                          <CommandList>
-                            <div className="px-2 py-6 text-center text-sm text-red-500">Error loading yarns</div>
-                          </CommandList>
-                        ) : (
-                          <>
-                            <CommandEmpty>No yarns found.</CommandEmpty>
-                            <CommandList>
-                              <CommandGroup>
-                                {(yarnsData || []).map((yarn: any) => {
-                                  const yarnId = yarn.yarn_id;
-                                  const yarnName = yarn.yarn_name || 'No name';
-                                  if (!yarnId) {
-                                    console.warn('[Yarn Render] Yarn without ID:', yarn);
-                                    return null;
-                                  }
-                                  const isSelected = formData.yarn_ids.includes(yarnId);
-                                  return (
-                                    <CommandItem
-                                      key={yarnId}
-                                      value={`${yarnId} ${yarnName}`}
-                                      onSelect={() => {
-                                        setFormData({
-                                          ...formData,
-                                          yarn_ids: isSelected
-                                            ? formData.yarn_ids.filter(id => id !== yarnId)
-                                            : [...formData.yarn_ids, yarnId]
-                                        });
-                                      }}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
-                                      <div className="flex flex-col">
-                                        <span className="text-sm font-medium">{yarnId}</span>
-                                        <span className="text-xs text-muted-foreground">{yarnName}</span>
-                                      </div>
-                                    </CommandItem>
-                                  );
-                                })}
-                              </CommandGroup>
-                            </CommandList>
-                          </>
-                        )}
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Trims</Label>
-                  <Popover open={trimsOpen} onOpenChange={setTrimsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="w-full justify-between h-10 text-sm">
-                        {formData.trims_ids && formData.trims_ids.length > 0 
-                          ? `${formData.trims_ids.length} trim(s) selected`
-                          : "Select trims..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search trims..." />
-                        <CommandEmpty>No trims found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {(trimsData || []).map((trim: any) => (
-                              <CommandItem
-                                key={trim.product_id}
-                                value={`${trim.product_id} ${trim.product_name}`}
-                                onSelect={() => {
-                                  const isSelected = formData.trims_ids.includes(trim.product_id);
-                                  setFormData({
-                                    ...formData,
-                                    trims_ids: isSelected
-                                      ? formData.trims_ids.filter(id => id !== trim.product_id)
-                                      : [...formData.trims_ids, trim.product_id]
-                                  });
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", formData.trims_ids.includes(trim.product_id) ? "opacity-100" : "opacity-0")} />
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-medium">{trim.product_id}</span>
-                                  <span className="text-xs text-muted-foreground">{trim.product_name}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Yarn Handover Date</Label>
-                  <Input className="h-10" type="date" value={formData.yarn_handover_date} onChange={(e) => setFormData({ ...formData, yarn_handover_date: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Trims Handover Date</Label>
-                  <Input className="h-10" type="date" value={formData.trims_handover_date} onChange={(e) => setFormData({ ...formData, trims_handover_date: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Required Date</Label>
-                  <Input className="h-10" type="date" value={formData.required_date} onChange={(e) => setFormData({ ...formData, required_date: e.target.value })} />
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Yarn Details</Label>
+                    <Input className="h-11" value={formData.yarn_details} onChange={(e) => setFormData({ ...formData, yarn_details: e.target.value })} placeholder="Additional yarn information" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Trims Details</Label>
+                    <Input className="h-11" value={formData.trims_details} onChange={(e) => setFormData({ ...formData, trims_details: e.target.value })} placeholder="Additional trims information" />
+                  </div>
                 </div>
               </div>
+              )}
 
-              {/* Row 3: Yarn Details, Trims Details - 2 columns */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Yarn Details</Label>
-                  <Input className="h-10" value={formData.yarn_details} onChange={(e) => setFormData({ ...formData, yarn_details: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Trims Details</Label>
-                  <Input className="h-10" value={formData.trims_details} onChange={(e) => setFormData({ ...formData, trims_details: e.target.value })} />
+              {/* Step 4: Important Dates */}
+              {currentStep === 4 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Important Dates</h3>
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Yarn Handover Date</Label>
+                    <Input className="h-11" type="date" value={formData.yarn_handover_date} onChange={(e) => setFormData({ ...formData, yarn_handover_date: e.target.value })} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Trims Handover Date</Label>
+                    <Input className="h-11" type="date" value={formData.trims_handover_date} onChange={(e) => setFormData({ ...formData, trims_handover_date: e.target.value })} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Required Date</Label>
+                    <Input className="h-11" type="date" value={formData.required_date} onChange={(e) => setFormData({ ...formData, required_date: e.target.value })} />
+                  </div>
                 </div>
               </div>
+              )}
 
-              {/* Row 4: Decorative Part (moved below yarn details, above additional instruction) */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Decorative Part</Label>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input 
-                      className="h-10 flex-1" 
-                      value={newDecorativePart} 
+              {/* Step 5: Decorative Parts & Additional Instructions */}
+              {currentStep === 5 && (
+              <>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Decorative Parts</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <Input
+                      className="h-11 flex-1"
+                      value={newDecorativePart}
                       onChange={(e) => setNewDecorativePart(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addDecorativePart())}
-                      placeholder="Enter decorative part..." 
+                      placeholder="Enter decorative part (e.g., embroidery, patches, appliques)..."
                     />
-                    <Button type="button" onClick={addDecorativePart} size="sm" className="h-10">
-                      <Plus className="h-4 w-4" />
+                    <Button type="button" onClick={addDecorativePart} size="lg" className="h-11 px-6">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Part
                     </Button>
                   </div>
                   {formData.decorative_part.length > 0 && (
-                    <div className="space-y-2 border rounded-lg p-3">
+                    <div className="grid grid-cols-2 gap-3 border rounded-lg p-4 bg-muted/30">
                       {formData.decorative_part.map((part, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <span className="flex-1 text-sm">{part}</span>
+                        <div key={idx} className="flex items-center gap-3 bg-background p-3 rounded-md shadow-sm">
+                          <span className="flex-1 text-sm font-medium">{part}</span>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => removeDecorativePart(idx)}
-                            className="h-6 w-6 p-0"
+                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
@@ -1049,44 +1144,44 @@ export default function AddSampleRequestPage() {
                 </div>
               </div>
 
-              {/* Row 5: Additional Instructions (full width with multiple entries) */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Additional Instructions</Label>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input 
-                      className="h-10 flex-1" 
-                      value={newInstruction} 
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Additional Instructions</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <Input
+                      className="h-11 flex-1"
+                      value={newInstruction}
                       onChange={(e) => setNewInstruction(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addInstruction())}
-                      placeholder="Enter instruction..." 
+                      placeholder="Enter special instruction or requirement..."
                     />
-                    <Button type="button" onClick={addInstruction} size="sm" className="h-10">
-                      <Plus className="h-4 w-4" />
+                    <Button type="button" onClick={addInstruction} size="lg" className="h-11 px-6">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Instruction
                     </Button>
                   </div>
                   {formData.additional_instruction.length > 0 && (
-                    <div className="space-y-2 border rounded-lg p-3">
+                    <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
                       {formData.additional_instruction.map((inst, idx) => (
-                        <div key={idx} className="flex items-start gap-2">
+                        <div key={idx} className="flex items-start gap-3 bg-background p-3 rounded-md shadow-sm">
                           <input
                             type="checkbox"
                             checked={inst.done}
                             onChange={() => toggleInstructionDone(idx)}
-                            className="mt-1"
+                            className="mt-1 h-4 w-4 cursor-pointer"
                           />
                           <span className={cn("flex-1 text-sm", inst.done && "line-through text-muted-foreground")}>
                             {inst.instruction}
                           </span>
-                          {inst.done && <Badge variant="secondary" className="text-xs">Done</Badge>}
+                          {inst.done && <Badge variant="secondary" className="text-xs">Completed</Badge>}
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => removeInstruction(idx)}
-                            className="h-6 w-6 p-0"
+                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
@@ -1094,12 +1189,15 @@ export default function AddSampleRequestPage() {
                   )}
                 </div>
               </div>
+              </>
+              )}
 
-              {/* Row 5: Attach Techpack (multiple files with types) */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Attach Techpack Files</Label>
-                <div className="space-y-3 border rounded-lg p-4">
-                  <div className="flex gap-2 flex-wrap">
+              {/* Step 6: Techpack Files */}
+              {currentStep === 6 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Attach Techpack Files</h3>
+                <div className="space-y-4 border rounded-lg p-6 bg-muted/30">
+                  <div className="flex gap-3 flex-wrap">
                     <input
                       type="file"
                       id="techpack-spec-sheet"
@@ -1110,8 +1208,9 @@ export default function AddSampleRequestPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={() => document.getElementById("techpack-spec-sheet")?.click()}
+                      className="h-11"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Spec Sheet
@@ -1119,8 +1218,9 @@ export default function AddSampleRequestPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={openSpecSheetGenerator}
+                      className="h-11"
                     >
                       <FileText className="mr-2 h-4 w-4" />
                       Generate Spec Sheet
@@ -1135,8 +1235,9 @@ export default function AddSampleRequestPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={() => document.getElementById("techpack-pdf")?.click()}
+                      className="h-11"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       PDF
@@ -1151,8 +1252,9 @@ export default function AddSampleRequestPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={() => document.getElementById("techpack-image")?.click()}
+                      className="h-11"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Image
@@ -1167,36 +1269,37 @@ export default function AddSampleRequestPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={() => document.getElementById("techpack-excel")?.click()}
+                      className="h-11"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Excel
                     </Button>
                   </div>
                   {formData.techpack_files.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mt-4">
                       {formData.techpack_files.map((file, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-muted p-2 rounded text-sm">
-                          <Badge variant="secondary" className="text-xs">{file.type}</Badge>
-                          <span className="flex-1">{file.filename}</span>
+                        <div key={idx} className="flex items-center gap-3 bg-background p-3 rounded-md shadow-sm">
+                          <Badge variant="secondary" className="text-xs font-semibold">{file.type}</Badge>
+                          <span className="flex-1 text-sm font-medium">{file.filename}</span>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => window.open(file.url, '_blank')}
-                            className="h-6 w-6 p-0"
+                            className="h-8 w-8 p-0"
                           >
-                            <FileText className="h-3 w-3" />
+                            <FileText className="h-4 w-4" />
                           </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => removeTechpackFile(idx)}
-                            className="h-6 w-6 p-0"
+                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
@@ -1204,31 +1307,223 @@ export default function AddSampleRequestPage() {
                   )}
                 </div>
               </div>
-              
-              <div className="flex justify-end gap-4 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    if (window.opener) {
-                      window.close();
-                    } else {
-                      router.push("/dashboard/erp/merchandising/sample-development");
-                    }
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createPrimaryMutation.isPending}>
-                  {createPrimaryMutation.isPending || updatePrimaryMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isEditing ? "Updating..." : "Creating..."}
-                    </>
-                  ) : (
-                    isEditing ? "Update Sample" : "Create Sample"
+              )}
+
+              {/* Step 7: Review & Submit */}
+              {currentStep === 7 && (
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold border-b pb-2">Review Your Sample Request</h3>
+
+                {/* Basic Information Review */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-base">Basic Information</h4>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep(1)}>Edit</Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Buyer:</span> <span className="font-medium">{selectedBuyer?.buyer_name || selectedBuyer?.brand_name || "Not selected"}</span></div>
+                    <div><span className="text-muted-foreground">Sample Name:</span> <span className="font-medium">{formData.sample_name || "Not entered"}</span></div>
+                    <div><span className="text-muted-foreground">Item:</span> <span className="font-medium">{formData.item || "Not selected"}</span></div>
+                    <div><span className="text-muted-foreground">Category:</span> <span className="font-medium">{formData.sample_category}</span></div>
+                    <div><span className="text-muted-foreground">Priority:</span> <span className="font-medium capitalize">{formData.priority}</span></div>
+                    <div><span className="text-muted-foreground">Request Pcs:</span> <span className="font-medium">{formData.request_pcs || "Not entered"}</span></div>
+                  </div>
+                </div>
+
+                {/* Specifications Review */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-base">Specifications</h4>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep(2)}>Edit</Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Gauge:</span> <span className="font-medium">{formatGaugeForDisplay(formData.gauge) || "Not entered"}</span></div>
+                    <div><span className="text-muted-foreground">PLY:</span> <span className="font-medium">{formData.ply || "Not entered"}</span></div>
+                    <div><span className="text-muted-foreground">Colors:</span> <span className="font-medium">{selectedColors.length} selected</span></div>
+                  </div>
+                  {/* Color Details */}
+                  {selectedColors.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <span className="text-xs text-muted-foreground">Selected Colors:</span>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedColors.map((color) => (
+                          <div key={`${color.type}-${color.id}`} className="flex items-center gap-2 bg-background rounded px-2 py-1 border">
+                            <div
+                              className="w-4 h-4 rounded border"
+                              style={{ backgroundColor: color.hex_code }}
+                            />
+                            <span className="text-xs font-medium">{color.name}</span>
+                            <Badge variant="outline" className="text-xs">{color.type === "hm" ? "H&M" : color.code}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </Button>
+                  {/* Size Details */}
+                  <div className="mt-3 pt-3 border-t">
+                    <span className="text-muted-foreground text-sm">Sizes:</span>
+                    <span className="font-medium text-sm ml-2">
+                      {selectedSizes.length > 0 ? `${selectedSizes.length} selected` : "None selected"}
+                    </span>
+                    {selectedSizes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedSizes.map((size) => (
+                          <Badge key={size.id} variant="secondary" className="text-xs">
+                            {size.size_name} ({size.garment_type_name}, {size.gender})
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Materials Review */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-base">Materials</h4>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep(3)}>Edit</Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Yarn IDs:</span> <span className="font-medium">{formData.yarn_ids.length > 0 ? formData.yarn_ids.join(", ") : "None selected"}</span></div>
+                    <div><span className="text-muted-foreground">Trims:</span> <span className="font-medium">{formData.trims_ids.length > 0 ? `${formData.trims_ids.length} selected` : "None selected"}</span></div>
+                    <div><span className="text-muted-foreground">Yarn Details:</span> <span className="font-medium">{formData.yarn_details || "Not entered"}</span></div>
+                    <div><span className="text-muted-foreground">Trims Details:</span> <span className="font-medium">{formData.trims_details || "Not entered"}</span></div>
+                  </div>
+                </div>
+
+                {/* Dates Review */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-base">Important Dates</h4>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep(4)}>Edit</Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Yarn Handover:</span> <span className="font-medium">{formData.yarn_handover_date || "Not set"}</span></div>
+                    <div><span className="text-muted-foreground">Trims Handover:</span> <span className="font-medium">{formData.trims_handover_date || "Not set"}</span></div>
+                    <div><span className="text-muted-foreground">Required Date:</span> <span className="font-medium">{formData.required_date || "Not set"}</span></div>
+                  </div>
+                </div>
+
+                {/* Additional Info Review */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-base">Additional Information</h4>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep(5)}>Edit</Button>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Decorative Parts:</span>
+                      {formData.decorative_part.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {formData.decorative_part.map((part, idx) => (
+                            <Badge key={idx} variant="secondary">{part}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="font-medium ml-2">None added</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Additional Instructions:</span>
+                      {formData.additional_instruction.length > 0 ? (
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          {formData.additional_instruction.map((inst, idx) => (
+                            <li key={idx} className={cn(inst.done && "line-through text-muted-foreground")}>
+                              {inst.instruction}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="font-medium ml-2">None added</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Files Review */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-base">Techpack Files</h4>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep(6)}>Edit</Button>
+                  </div>
+                  <div className="text-sm">
+                    {formData.techpack_files.length > 0 ? (
+                      <div className="space-y-2">
+                        {formData.techpack_files.map((file, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Badge variant="secondary">{file.type}</Badge>
+                            <span className="font-medium">{file.filename}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">No files attached</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              )}
+
+              {/* Navigation Buttons */}
+              <div className="flex justify-between gap-4 pt-6 border-t">
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={() => {
+                      if (window.opener) {
+                        window.close();
+                      } else {
+                        router.push("/dashboard/erp/merchandising/sample-development");
+                      }
+                    }}
+                    className="px-8"
+                  >
+                    Cancel
+                  </Button>
+                  {currentStep > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={goToPreviousStep}
+                      className="px-8"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  {currentStep < WIZARD_STEPS.length && (
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={goToNextStep}
+                      className="px-8"
+                    >
+                      Next
+                      <ChevronsUpDown className="ml-2 h-4 w-4 rotate-90" />
+                    </Button>
+                  )}
+                  {currentStep === WIZARD_STEPS.length && (
+                    <Button type="submit" disabled={createPrimaryMutation.isPending} size="lg" className="px-8">
+                      {createPrimaryMutation.isPending || updatePrimaryMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {isEditing ? "Updating..." : "Creating..."}
+                        </>
+                      ) : (
+                        <>
+                          {isEditing ? "Update Sample" : "Create Sample"}
+                          <Check className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             </form>
           </CardContent>

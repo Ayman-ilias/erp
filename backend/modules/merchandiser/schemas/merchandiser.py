@@ -330,6 +330,7 @@ class SamplePrimaryInfoBase(BaseModel):
     trims_handover_date: Optional[datetime] = None
     required_date: Optional[datetime] = None
     request_pcs: Optional[int] = None
+    priority: Optional[str] = Field(default='normal', description="Priority: urgent, high, normal, low")
     # Multiple additional instructions with done status: [{instruction: str, done: bool}, ...]
     additional_instruction: Optional[List[Dict[str, Any]]] = Field(default=None, description="Multiple Additional Instructions with status")
     # Multiple techpack files: [{url: str, filename: str, type: str}, ...]
@@ -364,6 +365,7 @@ class SamplePrimaryInfoUpdate(BaseModel):
     trims_handover_date: Optional[datetime] = None
     required_date: Optional[datetime] = None
     request_pcs: Optional[int] = None
+    priority: Optional[str] = Field(default=None, description="Priority: urgent, high, normal, low")
     # Multiple additional instructions with done status: [{instruction: str, done: bool}, ...]
     additional_instruction: Optional[List[Dict[str, Any]]] = Field(default=None, description="Multiple Additional Instructions with status")
     # Multiple techpack files: [{url: str, filename: str, type: str}, ...]

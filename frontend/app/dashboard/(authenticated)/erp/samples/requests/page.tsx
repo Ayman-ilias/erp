@@ -59,7 +59,7 @@ export default function SampleRequestPage() {
     size_ids: [] as string[],  // Array of size IDs (auto_generated_id)
     color_name: "", // Legacy field for backward compatibility
     size_name: "", // Legacy field for backward compatibility
-    additional_instruction: [] as Array<{instruction: string, done: boolean}>,
+    additional_instruction: "" as string | Array<{instruction: string, done: boolean}>,
     techpack_url: "",
     techpack_filename: "",
   });
@@ -74,6 +74,11 @@ export default function SampleRequestPage() {
 
   useEffect(() => {
     loadData();
+    // Auto-sync every 30 seconds
+    const interval = setInterval(() => {
+      loadData();
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Listen for messages from child windows to refresh data (bidirectional sync)
@@ -164,6 +169,14 @@ export default function SampleRequestPage() {
     if (highPriorityOnly) {
       filtered = filtered.filter((r) => r.priority === "urgent" || r.priority === "high");
     }
+
+    // Sort by updated_at descending (newest first)
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
     setFilteredRequests(filtered);
   };
 
@@ -240,7 +253,7 @@ export default function SampleRequestPage() {
         yarn_details: formData.yarn_details || null,
         trims_ids: formData.trims_ids ? formData.trims_ids.split(",").map((s) => s.trim()).filter(Boolean) : null,
         trims_details: formData.trims_details || null,
-        decorative_part: formData.decorative_part || null,
+        decorative_part: formData.decorative_part ? [formData.decorative_part] : null,
         decorative_details: formData.decorative_details || null,
         yarn_handover_date: formData.yarn_handover_date ? new Date(formData.yarn_handover_date).toISOString() : null,
         trims_handover_date: formData.trims_handover_date ? new Date(formData.trims_handover_date).toISOString() : null,
@@ -253,17 +266,20 @@ export default function SampleRequestPage() {
         color_name: formData.color_ids.length > 0 ? colors.filter(c => formData.color_ids.includes(c.id)).map(c => c.color_name).join(", ") : null,
         size_name: formData.size_ids.length > 0 ? sizes.filter(s => formData.size_ids.includes(s.id)).map(s => s.size_name).join(", ") : null,
         additional_instruction: (() => {
-          // Convert array to newline-separated string for backend (samples DB expects string)
+          // Convert to array of strings for backend (samples DB expects List[str])
           if (!formData.additional_instruction) return null;
-          if (typeof formData.additional_instruction === 'string') return formData.additional_instruction;
+          if (typeof formData.additional_instruction === 'string') {
+            return formData.additional_instruction.trim() ? [formData.additional_instruction] : null;
+          }
           if (Array.isArray(formData.additional_instruction)) {
             if (formData.additional_instruction.length === 0) return null;
             return formData.additional_instruction.map((inst: any) => {
-              const done = inst.done ? "✓ " : "";
-              return `${done}${typeof inst === 'string' ? inst : (inst.instruction || String(inst))}`;
-            }).join("\n");
+              if (typeof inst === 'string') return inst;
+              if (inst.instruction) return inst.instruction;
+              return String(inst);
+            }).filter(Boolean);
           }
-          return String(formData.additional_instruction);
+          return [String(formData.additional_instruction)];
         })(),
         techpack_url: formData.techpack_url || null,
         techpack_filename: formData.techpack_filename || null,
@@ -400,420 +416,17 @@ export default function SampleRequestPage() {
           <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              Sample requests are created by the Merchandiser
+              Sample requests are automatically synced from Merchandising
             </p>
             <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-              New sample requests must be created in the <strong>Merchandising → Sample Development</strong> module. 
-              This page is for viewing and editing existing requests only.
+              New sample requests are created in the <strong>Merchandising → Sample Development</strong> module and automatically appear here.
+              Click any request to view full details.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncSamples}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Sync from Merchandiser
-          </Button>
         </div>
       </Card>
 
-      {/* Edit Dialog - Only opens when editingItem is set */}
-      <Dialog open={isDialogOpen} onOpenChange={(open) => { 
-        if (!open) {
-          setIsDialogOpen(false);
-          resetForm();
-        } else if (editingItem) {
-          setIsDialogOpen(true);
-        }
-      }}>
-          <DialogContent 
-            className="max-h-[90vh] overflow-y-auto !p-6" 
-            style={{ 
-              maxWidth: 'calc(100vw - 4rem)', 
-              width: 'calc(100vw - 4rem)',
-              minWidth: '1400px'
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Edit Sample Request</DialogTitle>
-              <DialogDescription>Update sample request information. Sample requests are created in the Merchandising module.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Row 1: Buyer, Sample Name, Item, Category, Gauge, PLY, Color, Size - All side by side */}
-              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(8, minmax(0, 1fr))' }}>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Buyer *</Label>
-                  <Popover open={buyerOpen} onOpenChange={setBuyerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" aria-expanded={buyerOpen} className="w-full justify-between h-10 text-sm">
-                        {selectedBuyer ? selectedBuyer.buyer_name : "Select..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[350px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search buyer..." value={buyerSearch} onValueChange={setBuyerSearch} />
-                        <CommandList>
-                          <CommandEmpty>No buyer found.</CommandEmpty>
-                          <CommandGroup>
-                            {filteredBuyers.map((b) => (
-                              <CommandItem key={b.id} value={b.id.toString()} onSelect={() => handleBuyerSelect(b.id.toString())}>
-                                <Check className={cn("mr-2 h-4 w-4", formData.buyer_id === b.id.toString() ? "opacity-100" : "opacity-0")} />
-                                {b.buyer_name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sample Name *</Label>
-                  <Input className="h-10" value={formData.sample_name} onChange={(e) => setFormData({ ...formData, sample_name: e.target.value })} required />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Item</Label>
-                  <Input className="h-10" value={formData.item} onChange={(e) => setFormData({ ...formData, item: e.target.value })} placeholder="Sweater" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Category *</Label>
-                  <Select value={formData.sample_category} onValueChange={(v) => setFormData({ ...formData, sample_category: v })}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {SAMPLE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Gauge</Label>
-                  <Input className="h-10" value={formData.gauge} onChange={(e) => setFormData({ ...formData, gauge: e.target.value })} placeholder="12GG" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">PLY</Label>
-                  <Input className="h-10" type="number" value={formData.ply} onChange={(e) => setFormData({ ...formData, ply: e.target.value })} placeholder="2" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Priority</Label>
-                  <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="urgent">Urgent - Instant Needed</SelectItem>
-                      <SelectItem value="high">High Priority</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="low">Low Priority</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Colors</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="h-10 w-full justify-between font-normal"
-                      >
-                        {formData.color_ids.length > 0
-                          ? `${formData.color_ids.length} color(s) selected`
-                          : "Select colors..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search colors..." />
-                        <CommandEmpty>No colors found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {colors.map((color) => (
-                              <CommandItem
-                                key={color.id}
-                                value={color.color_name}
-                                onSelect={() => {
-                                  const newColorIds = formData.color_ids.includes(color.id)
-                                    ? formData.color_ids.filter(id => id !== color.id)
-                                    : [...formData.color_ids, color.id];
-                                  setFormData({ ...formData, color_ids: newColorIds });
-                                }}
-                              >
-                                <div className="flex items-center gap-2 w-full">
-                                  <div
-                                    className="w-4 h-4 rounded border"
-                                    style={{ backgroundColor: color.hex_code }}
-                                  />
-                                  <span>{color.color_name}</span>
-                                  {color.tcx_code && (
-                                    <span className="text-xs text-muted-foreground ml-auto">{color.tcx_code}</span>
-                                  )}
-                                  {formData.color_ids.includes(color.id) && (
-                                    <Check className="ml-auto h-4 w-4" />
-                                  )}
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sizes</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="h-10 w-full justify-between font-normal"
-                      >
-                        {formData.size_ids.length > 0
-                          ? `${formData.size_ids.length} size(s) selected`
-                          : "Select sizes..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search sizes..." />
-                        <CommandEmpty>No sizes found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {sizes.map((size) => (
-                              <CommandItem
-                                key={size.id}
-                                value={size.size_name}
-                                onSelect={() => {
-                                  const newSizeIds = formData.size_ids.includes(size.id)
-                                    ? formData.size_ids.filter(id => id !== size.id)
-                                    : [...formData.size_ids, size.id];
-                                  setFormData({ ...formData, size_ids: newSizeIds });
-                                }}
-                              >
-                                <span>{size.size_name}</span>
-                                {formData.size_ids.includes(size.id) && (
-                                  <Check className="ml-auto h-4 w-4" />
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Row 2: Request Pcs, Yarn ID, Trims ID, Decorative Part, Yarn Handover Date, Trims Handover Date, Required Date */}
-              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Request Pcs</Label>
-                  <Input className="h-10" type="number" value={formData.request_pcs} onChange={(e) => setFormData({ ...formData, request_pcs: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Yarn ID</Label>
-                  <Popover open={yarnOpen} onOpenChange={setYarnOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="h-10 w-full justify-between font-normal">
-                        {formData.yarn_id ? yarns.find(y => y.yarn_id === formData.yarn_id)?.yarn_id || formData.yarn_id : "Select yarn..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search yarn..." />
-                        <CommandEmpty>No yarn found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {yarns.map((yarn) => (
-                              <CommandItem
-                                key={yarn.yarn_id}
-                                value={yarn.yarn_id}
-                                onSelect={() => {
-                                  setFormData({ ...formData, yarn_id: yarn.yarn_id });
-                                  setYarnOpen(false);
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", formData.yarn_id === yarn.yarn_id ? "opacity-100" : "opacity-0")} />
-                                <div>
-                                  <div className="font-medium">{yarn.yarn_id}</div>
-                                  <div className="text-xs text-muted-foreground">{yarn.yarn_name || yarn.yarn_type}</div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Trims</Label>
-                  <Popover open={trimsOpen} onOpenChange={setTrimsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="h-10 w-full justify-between font-normal">
-                        {formData.trims_ids && formData.trims_ids.length > 0 
-                          ? `${formData.trims_ids.split(',').length} trim(s) selected`
-                          : "Select trims..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search trims..." />
-                        <CommandEmpty>No trims found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {trims.map((trim) => (
-                              <CommandItem
-                                key={trim.product_id}
-                                value={trim.product_id}
-                                onSelect={() => {
-                                  const currentTrims = formData.trims_ids ? formData.trims_ids.split(',').map(t => t.trim()).filter(Boolean) : [];
-                                  const isSelected = currentTrims.includes(trim.product_id);
-                                  const newTrims = isSelected
-                                    ? currentTrims.filter(t => t !== trim.product_id)
-                                    : [...currentTrims, trim.product_id];
-                                  setFormData({ ...formData, trims_ids: newTrims.join(', ') });
-                                }}
-                              >
-                                <div className="flex items-center w-full">
-                                  <Check className={cn("mr-2 h-4 w-4", formData.trims_ids?.includes(trim.product_id) ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex-1">
-                                    <div className="font-medium">{trim.product_id}</div>
-                                    <div className="text-xs text-muted-foreground">{trim.product_name}</div>
-                                  </div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Yarn Handover Date</Label>
-                  <Input className="h-10" type="date" value={formData.yarn_handover_date} onChange={(e) => setFormData({ ...formData, yarn_handover_date: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Trims Handover Date</Label>
-                  <Input className="h-10" type="date" value={formData.trims_handover_date} onChange={(e) => setFormData({ ...formData, trims_handover_date: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Required Date</Label>
-                  <Input className="h-10" type="date" value={formData.required_date} onChange={(e) => setFormData({ ...formData, required_date: e.target.value })} />
-                </div>
-              </div>
-
-              {/* Row 3: Yarn Details, Trims Details, Decorative Part, Decorative Details - Side by side */}
-              <div className="grid grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Yarn Details</Label>
-                  <Input className="h-10" value={formData.yarn_details} onChange={(e) => setFormData({ ...formData, yarn_details: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Trims Details</Label>
-                  <Input className="h-10" value={formData.trims_details} onChange={(e) => setFormData({ ...formData, trims_details: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Decorative Part</Label>
-                  <Input className="h-10" value={formData.decorative_part} onChange={(e) => setFormData({ ...formData, decorative_part: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Decorative Details</Label>
-                  <Input className="h-10" value={formData.decorative_details} onChange={(e) => setFormData({ ...formData, decorative_details: e.target.value })} />
-                </div>
-              </div>
-
-              {/* Row 4: Techpack - Full width */}
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Attach Techpack</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 flex-1"
-                      value={formData.techpack_filename}
-                      placeholder="No file"
-                      readOnly
-                    />
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      className="hidden"
-                    />
-                    <Button type="button" variant="outline" size="sm" className="h-10 px-3" onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                    {formData.techpack_url && (
-                      <Button type="button" variant="ghost" size="sm" className="h-10 px-3" onClick={() => window.open(formData.techpack_url, '_blank')}>
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 4: Additional Instructions (full width with multiple entries and done status) */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Additional Instructions</Label>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input 
-                      className="h-10 flex-1" 
-                      value={newInstruction || ""} 
-                      onChange={(e) => setNewInstruction(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addInstruction())}
-                      placeholder="Enter instruction..." 
-                    />
-                    <Button type="button" onClick={addInstruction} size="sm" className="h-10">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {formData.additional_instruction && formData.additional_instruction.length > 0 && (
-                    <div className="space-y-2 border rounded-lg p-3">
-                      {formData.additional_instruction.map((inst: any, idx: number) => (
-                        <div key={idx} className="flex items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={inst.done || false}
-                            onChange={() => toggleInstructionDone(idx)}
-                            className="mt-1"
-                          />
-                          <span className={cn("flex-1 text-sm", inst.done && "line-through text-muted-foreground")}>
-                            {typeof inst === 'string' ? inst : inst.instruction}
-                          </span>
-                          {inst.done && <Badge variant="secondary" className="text-xs">Done</Badge>}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeInstruction(idx)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Update</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+      {/* Edit dialog removed - samples are read-only here, edit in Merchandising module */}
 
       {/* Filters */}
       <Card className="p-4">
@@ -857,81 +470,65 @@ export default function SampleRequestPage() {
         </div>
       </Card>
 
-      {/* Table */}
+      {/* Simplified Table - Only show Date, Sample ID, Priority, Required Date */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Date Created</TableHead>
               <TableHead>Sample ID</TableHead>
               <TableHead>Buyer</TableHead>
               <TableHead>Sample Name</TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead>Gauge</TableHead>
-              <TableHead>PLY</TableHead>
-              <TableHead>Color</TableHead>
-              <TableHead>Size</TableHead>
-              <TableHead>Category</TableHead>
               <TableHead>Priority</TableHead>
               <TableHead>Required Date</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredRequests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   {loading ? "Loading..." : "No sample requests found"}
                 </TableCell>
               </TableRow>
             ) : (
               filteredRequests.map((item) => (
-                <TableRow key={item.id} className={item.priority === 'urgent' || item.priority === 'high' ? 'bg-orange-50 dark:bg-orange-950/20' : ''}>
-                  <TableCell className="font-mono font-medium">
+                <TableRow
+                  key={item.id}
+                  className={cn(
+                    "cursor-pointer hover:bg-muted/50 transition-colors",
+                    item.priority === 'urgent' && 'bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/30'
+                  )}
+                  onClick={() => handleView(item)}
+                >
+                  <TableCell className="font-medium">
+                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}
+                  </TableCell>
+                  <TableCell className="font-mono font-bold">
                     <div className="flex items-center gap-2">
-                      {(item.priority === 'urgent' || item.priority === 'high') && (
-                        <Zap className="h-4 w-4 text-orange-600 dark:text-orange-400 animate-pulse" />
+                      {item.priority === 'urgent' && (
+                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 animate-pulse" />
                       )}
                       {item.sample_id}
                     </div>
                   </TableCell>
                   <TableCell>{item.buyer_name}</TableCell>
                   <TableCell>{item.sample_name}</TableCell>
-                  <TableCell>{item.item || "-"}</TableCell>
-                  <TableCell>{item.gauge || "-"}</TableCell>
-                  <TableCell>{item.ply || "-"}</TableCell>
-                  <TableCell>{item.color_name || "-"}</TableCell>
-                  <TableCell>{item.size_name || "-"}</TableCell>
-                  <TableCell><Badge variant="outline">{item.sample_category}</Badge></TableCell>
                   <TableCell>
                     <Badge variant={
                       item.priority === 'urgent' ? 'destructive' :
                       item.priority === 'high' ? 'default' :
                       item.priority === 'low' ? 'secondary' : 'outline'
-                    }>
-                      {item.priority === 'urgent' || item.priority === 'high' ? (
-                        <Zap className="h-3 w-3 mr-1 inline" />
-                      ) : null}
+                    } className={item.priority === 'urgent' ? 'animate-pulse' : ''}>
+                      {item.priority === 'urgent' && <AlertCircle className="h-3 w-3 mr-1 inline" />}
+                      {item.priority === 'high' && <Zap className="h-3 w-3 mr-1 inline" />}
                       {item.priority || 'normal'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{item.required_date?.split("T")[0] || "-"}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleView(item)} title="View Details">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => {
-                        window.open(`/dashboard/erp/samples/requests/add-request?edit=${item.id}`, "_blank");
-                      }}
-                      title="Edit Sample Request"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                  <TableCell className={cn(
+                    "font-medium",
+                    item.priority === 'urgent' && "text-red-600 dark:text-red-400"
+                  )}>
+                    {item.required_date?.split("T")[0] || "-"}
                   </TableCell>
                 </TableRow>
               ))
@@ -940,49 +537,171 @@ export default function SampleRequestPage() {
         </Table>
       </div>
 
-      {/* View Dialog */}
+      {/* View Dialog - Read-only with organized sections */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Sample Request Details</DialogTitle>
+            <DialogTitle className="text-2xl flex items-center gap-3">
+              Sample Request Details
+              {viewingItem?.priority === 'urgent' && (
+                <Badge variant="destructive" className="animate-pulse">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  URGENT
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Read-only view • Created from Merchandising module
+            </DialogDescription>
           </DialogHeader>
           {viewingItem && (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-4 gap-4">
-                <div><span className="font-medium">Sample ID:</span> {viewingItem.sample_id}</div>
-                <div><span className="font-medium">Buyer:</span> {viewingItem.buyer_name}</div>
-                <div><span className="font-medium">Sample Name:</span> {viewingItem.sample_name}</div>
-                <div><span className="font-medium">Category:</span> {viewingItem.sample_category}</div>
-                <div><span className="font-medium">Item:</span> {viewingItem.item || "-"}</div>
-                <div><span className="font-medium">Gauge:</span> {viewingItem.gauge || "-"}</div>
-                <div><span className="font-medium">PLY:</span> {viewingItem.ply || "-"}</div>
-                <div><span className="font-medium">Request Pcs:</span> {viewingItem.request_pcs || "-"}</div>
-                <div><span className="font-medium">Color:</span> {viewingItem.color_name || "-"}</div>
-                <div><span className="font-medium">Size:</span> {viewingItem.size_name || "-"}</div>
-                <div><span className="font-medium">Yarn ID:</span> {viewingItem.yarn_id || "-"}</div>
-                <div><span className="font-medium">Trims IDs:</span> {viewingItem.trims_ids?.join(", ") || "-"}</div>
-                <div><span className="font-medium">Decorative Part:</span> {viewingItem.decorative_part || "-"}</div>
-                <div><span className="font-medium">Required Date:</span> {viewingItem.required_date?.split("T")[0] || "-"}</div>
-                <div><span className="font-medium">Yarn Handover:</span> {viewingItem.yarn_handover_date?.split("T")[0] || "-"}</div>
-                <div><span className="font-medium">Trims Handover:</span> {viewingItem.trims_handover_date?.split("T")[0] || "-"}</div>
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <h4 className="font-semibold text-base mb-3 border-b pb-2">Basic Information</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Sample ID:</span>
+                    <p className="font-mono font-bold text-base">{viewingItem.sample_id}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Buyer:</span>
+                    <p className="font-medium">{viewingItem.buyer_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Sample Name:</span>
+                    <p className="font-medium">{viewingItem.sample_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Item:</span>
+                    <p className="font-medium">{viewingItem.item || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Category:</span>
+                    <p><Badge variant="outline">{viewingItem.sample_category}</Badge></p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Priority:</span>
+                    <p>
+                      <Badge variant={
+                        viewingItem.priority === 'urgent' ? 'destructive' :
+                        viewingItem.priority === 'high' ? 'default' :
+                        viewingItem.priority === 'low' ? 'secondary' : 'outline'
+                      }>
+                        {viewingItem.priority || 'normal'}
+                      </Badge>
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Request Pieces:</span>
+                    <p className="font-medium">{viewingItem.request_pcs || "-"}</p>
+                  </div>
+                </div>
               </div>
+
+              {/* Specifications */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <h4 className="font-semibold text-base mb-3 border-b pb-2">Specifications</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Gauge:</span>
+                    <p className="font-medium">{viewingItem.gauge || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">PLY:</span>
+                    <p className="font-medium">{viewingItem.ply || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Colors:</span>
+                    <p className="font-medium">{viewingItem.color_name || "-"}</p>
+                  </div>
+                  <div className="col-span-3">
+                    <span className="text-muted-foreground">Sizes:</span>
+                    <p className="font-medium">{viewingItem.size_name || "-"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Materials */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <h4 className="font-semibold text-base mb-3 border-b pb-2">Materials</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Yarn ID:</span>
+                    <p className="font-medium">{viewingItem.yarn_id || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Trims IDs:</span>
+                    <p className="font-medium">{viewingItem.trims_ids?.join(", ") || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Yarn Details:</span>
+                    <p className="font-medium">{viewingItem.yarn_details || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Trims Details:</span>
+                    <p className="font-medium">{viewingItem.trims_details || "-"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Decorative Part:</span>
+                    <p className="font-medium">{viewingItem.decorative_part || "-"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Important Dates */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <h4 className="font-semibold text-base mb-3 border-b pb-2">Important Dates</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Yarn Handover:</span>
+                    <p className="font-medium">{viewingItem.yarn_handover_date?.split("T")[0] || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Trims Handover:</span>
+                    <p className="font-medium">{viewingItem.trims_handover_date?.split("T")[0] || "-"}</p>
+                  </div>
+                  <div>
+                    <span className={cn(
+                      "text-muted-foreground",
+                      viewingItem.priority === 'urgent' && "text-red-600 dark:text-red-400 font-semibold"
+                    )}>
+                      Required Date:
+                    </span>
+                    <p className={cn(
+                      "font-medium",
+                      viewingItem.priority === 'urgent' && "text-red-600 dark:text-red-400 font-bold text-lg"
+                    )}>
+                      {viewingItem.required_date?.split("T")[0] || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Information */}
               {viewingItem.additional_instruction && (
-                <div className="border-t pt-4">
-                  <span className="font-medium">Additional Instructions:</span>
-                  <p className="mt-1">{viewingItem.additional_instruction}</p>
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-base mb-3 border-b pb-2">Additional Instructions</h4>
+                  <div className="text-sm whitespace-pre-wrap">{viewingItem.additional_instruction}</div>
                 </div>
               )}
+
+              {/* Techpack Files */}
               {viewingItem.techpack_filename && (
-                <div className="border-t pt-4 flex items-center gap-2">
-                  <span className="font-medium">Techpack:</span>
-                  <Button variant="link" onClick={() => window.open(viewingItem.techpack_url, '_blank')}>
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-base mb-3 border-b pb-2">Techpack Files</h4>
+                  <Button variant="outline" onClick={() => window.open(viewingItem.techpack_url, '_blank')}>
                     <FileText className="mr-2 h-4 w-4" />
                     {viewingItem.techpack_filename}
+                    <ExternalLink className="ml-2 h-3 w-3" />
                   </Button>
                 </div>
               )}
             </div>
           )}
+          <DialogFooter>
+            <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

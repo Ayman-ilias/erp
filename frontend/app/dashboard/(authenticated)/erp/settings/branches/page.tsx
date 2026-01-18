@@ -26,6 +26,7 @@ import { PlusCircle, Edit, Trash2, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { settingsService } from "@/services/api";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -33,6 +34,7 @@ import { useAuth } from "@/lib/auth-context";
 export default function BranchesPage() {
   const { user, token } = useAuth();
   const [branches, setBranches] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -48,13 +50,25 @@ export default function BranchesPage() {
     email: "",
     manager_name: "",
     is_active: true,
+    company_id: null as number | null,
   });
 
   useEffect(() => {
     if (token && user?.is_superuser) {
       loadData();
+      loadCompanies();
     }
   }, [token, user]);
+
+  const loadCompanies = async () => {
+    try {
+      if (!token) return;
+      const data = await settingsService.companies.getAll(token);
+      setCompanies(Array.isArray(data) ? data.filter((c: any) => c.is_active) : []);
+    } catch (error) {
+      console.error("Error loading companies:", error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -78,19 +92,23 @@ export default function BranchesPage() {
         return;
       }
 
+      console.log("Submitting branch data:", formData);
+      console.log("Token present:", !!token);
+
       if (editingItem) {
         await settingsService.branches.update(editingItem.id, formData, token);
         toast.success("Branch updated successfully");
       } else {
-        await settingsService.branches.create(formData, token);
+        const result = await settingsService.branches.create(formData, token);
+        console.log("Branch created:", result);
         toast.success("Branch created successfully");
       }
       setIsDialogOpen(false);
       resetForm();
       loadData();
     } catch (error: any) {
+      console.error("Error saving branch:", error);
       toast.error(error?.message || "Failed to save branch");
-      console.error(error);
     }
   };
 
@@ -108,6 +126,7 @@ export default function BranchesPage() {
       email: item.email || "",
       manager_name: item.manager_name || "",
       is_active: item.is_active !== false,
+      company_id: item.company_id || null,
     });
     setIsDialogOpen(true);
   };
@@ -143,6 +162,7 @@ export default function BranchesPage() {
       email: "",
       manager_name: "",
       is_active: true,
+      company_id: null,
     });
   };
 
@@ -176,6 +196,25 @@ export default function BranchesPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <Select
+                    value={formData.company_id?.toString() || "none"}
+                    onValueChange={(value) => setFormData({ ...formData, company_id: value === "none" ? null : parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select company (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id.toString()}>
+                          {company.company_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Branch Code *</Label>
@@ -241,6 +280,7 @@ export default function BranchesPage() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>City</TableHead>
               <TableHead>Manager</TableHead>
@@ -250,7 +290,7 @@ export default function BranchesPage() {
           </TableHeader>
           <TableBody>
             {branches.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">{loading ? "Loading..." : "No branches found"}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">{loading ? "Loading..." : "No branches found"}</TableCell></TableRow>
             ) : (
               branches.map((item) => (
                 <TableRow key={item.id}>
@@ -259,6 +299,7 @@ export default function BranchesPage() {
                     {item.is_head_office && <Badge variant="secondary" className="ml-2">HQ</Badge>}
                   </TableCell>
                   <TableCell>{item.branch_name}</TableCell>
+                  <TableCell>{item.company_name || <span className="text-muted-foreground">Unassigned</span>}</TableCell>
                   <TableCell>{item.branch_type || "-"}</TableCell>
                   <TableCell>{item.city || "-"}</TableCell>
                   <TableCell>{item.manager_name || "-"}</TableCell>

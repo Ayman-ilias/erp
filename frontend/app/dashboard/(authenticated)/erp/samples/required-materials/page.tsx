@@ -16,6 +16,9 @@ import { PlusCircle, Edit, Trash2, Search, X, Check, ChevronsUpDown, Plus } from
 import { samplesService, api } from "@/services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { UnitSelector } from "@/components/uom/UnitSelector";
+import { InlineConverter } from "@/components/uom/InlineConverter";
+import { QuantityWithUnit } from "@/components/uom/UnitDisplay";
 
 const MATERIAL_CATEGORIES = [
   { id: "yarn", label: "Yarn", idField: "yarn_id", nameField: "yarn_name" },
@@ -34,7 +37,7 @@ interface MaterialEntry {
   product_name: string;
   sub_category: string;
   required_quantity: string;
-  uom: string;
+  unit_id: number;  // Changed from uom to unit_id
 }
 
 export default function SampleRequiredMaterialPage() {
@@ -192,7 +195,7 @@ export default function SampleRequiredMaterialPage() {
         product_name: "",
         sub_category: "",
         required_quantity: "",
-        uom: "",
+        unit_id: 0,  // Changed from uom to unit_id
       };
       setMaterialEntries((entries) => [...entries, newEntry]);
       setSelectedCategories((prev) => [...prev, categoryId]);
@@ -216,7 +219,7 @@ export default function SampleRequiredMaterialPage() {
         product_name: "",
         sub_category: "",
         required_quantity: "",
-        uom: "",
+        unit_id: 0,  // Changed from uom to unit_id
       }));
       setMaterialEntries(newEntries);
     } else {
@@ -243,7 +246,7 @@ export default function SampleRequiredMaterialPage() {
                 product_id: product[idField] || product.id.toString(),
                 product_name: product[nameField] || "",
                 sub_category: product.sub_category || product.category || "",
-                uom: product.uom || product.unit || "",
+                unit_id: 0,  // Reset unit_id when product changes, user needs to select
               }
             : entry
         )
@@ -256,6 +259,14 @@ export default function SampleRequiredMaterialPage() {
     setMaterialEntries((entries) =>
       entries.map((entry) =>
         entry.id === entryId ? { ...entry, required_quantity: quantity } : entry
+      )
+    );
+  };
+
+  const handleUnitChange = (entryId: string, unitId: number) => {
+    setMaterialEntries((entries) =>
+      entries.map((entry) =>
+        entry.id === entryId ? { ...entry, unit_id: unitId } : entry
       )
     );
   };
@@ -274,7 +285,7 @@ export default function SampleRequiredMaterialPage() {
       product_name: "",
       sub_category: "",
       required_quantity: "",
-      uom: "",
+      unit_id: 0,  // Changed from uom to unit_id
     };
     setMaterialEntries((entries) => [...entries, newEntry]);
   };
@@ -291,9 +302,9 @@ export default function SampleRequiredMaterialPage() {
       return;
     }
 
-    const validEntries = materialEntries.filter((e) => e.product_id && e.required_quantity);
+    const validEntries = materialEntries.filter((e) => e.product_id && e.required_quantity && e.unit_id);
     if (validEntries.length === 0) {
-      toast.error("Please add at least one material with quantity");
+      toast.error("Please add at least one material with quantity and unit");
       return;
     }
 
@@ -308,7 +319,7 @@ export default function SampleRequiredMaterialPage() {
           category: entry.category,
           sub_category: entry.sub_category,
           required_quantity: parseFloat(entry.required_quantity),
-          uom: entry.uom,
+          unit_id: entry.unit_id,  // Changed from uom to unit_id
           remarks: null,
         };
 
@@ -347,7 +358,7 @@ export default function SampleRequiredMaterialPage() {
       product_name: item.product_name || "",
       sub_category: item.sub_category || "",
       required_quantity: item.required_quantity?.toString() || "",
-      uom: item.uom || "",
+      unit_id: item.unit_id || 0,  // Changed from uom to unit_id
     }]);
 
     setIsDialogOpen(true);
@@ -564,23 +575,38 @@ export default function SampleRequiredMaterialPage() {
                               <Input value={entry.sub_category} disabled className="bg-muted h-10" />
                             </div>
 
-                            {/* Required Quantity */}
+                            {/* Required Quantity with InlineConverter */}
                             <div className="col-span-1 space-y-2">
                               <Label className="text-sm font-medium">Qty *</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={entry.required_quantity}
-                                onChange={(e) => handleQuantityChange(entry.id, e.target.value)}
-                                className="h-10"
-                              />
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={entry.required_quantity}
+                                  onChange={(e) => handleQuantityChange(entry.id, e.target.value)}
+                                  className="h-10"
+                                />
+                                {/* InlineConverter - enabled when quantity is entered and unit is selected */}
+                                {entry.required_quantity && entry.unit_id > 0 && (
+                                  <InlineConverter
+                                    value={parseFloat(entry.required_quantity) || 0}
+                                    fromUnitId={entry.unit_id}
+                                    categoryName={getCategoryLabel(categoryId)}
+                                  />
+                                )}
+                              </div>
                             </div>
 
-                            {/* UoM (auto-filled) */}
+                            {/* Unit Selection */}
                             <div className="col-span-1 space-y-2">
-                              <Label className="text-sm font-medium">UoM</Label>
-                              <Input value={entry.uom} disabled className="bg-muted h-10" />
+                              <Label className="text-sm font-medium">Unit *</Label>
+                              <UnitSelector
+                                value={entry.unit_id || undefined}
+                                onChange={(unitId) => handleUnitChange(entry.id, unitId)}
+                                placeholder="Select unit..."
+                                className="h-10"
+                              />
                             </div>
 
                             {/* Remove Button */}
@@ -615,8 +641,8 @@ export default function SampleRequiredMaterialPage() {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={materialEntries.filter((e) => e.product_id && e.required_quantity).length === 0}>
-                  {editingItem ? "Update" : `Add ${materialEntries.filter((e) => e.product_id && e.required_quantity).length} Material(s)`}
+                <Button type="submit" disabled={materialEntries.filter((e) => e.product_id && e.required_quantity && e.unit_id).length === 0}>
+                  {editingItem ? "Update" : `Add ${materialEntries.filter((e) => e.product_id && e.required_quantity && e.unit_id).length} Material(s)`}
                 </Button>
               </DialogFooter>
             </form>
@@ -652,15 +678,14 @@ export default function SampleRequiredMaterialPage() {
               <TableHead>Product ID</TableHead>
               <TableHead>Product Name</TableHead>
               <TableHead>Sub-Category</TableHead>
-              <TableHead>Qty</TableHead>
-              <TableHead>UoM</TableHead>
+              <TableHead>Qty & Unit</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredMaterials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   {loading ? "Loading..." : "No materials found"}
                 </TableCell>
               </TableRow>
@@ -676,8 +701,18 @@ export default function SampleRequiredMaterialPage() {
                     <TableCell className="font-mono">{item.product_id || "-"}</TableCell>
                     <TableCell>{item.product_name || "-"}</TableCell>
                     <TableCell>{item.sub_category || "-"}</TableCell>
-                    <TableCell>{item.required_quantity || "-"}</TableCell>
-                    <TableCell>{item.uom || "-"}</TableCell>
+                    <TableCell>
+                      {item.unit_id && item.required_quantity ? (
+                        <QuantityWithUnit
+                          value={item.required_quantity}
+                          unitId={item.unit_id}
+                          showUnitType={true}
+                          precision={2}
+                        />
+                      ) : (
+                        item.required_quantity ? `${item.required_quantity} ${item.unit?.symbol || item.unit_id || ""}` : "-"
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
                         <Edit className="h-4 w-4" />

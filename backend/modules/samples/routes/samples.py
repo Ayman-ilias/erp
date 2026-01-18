@@ -43,6 +43,8 @@ from modules.samples.schemas.sample import (
     OperationTypeCreate, OperationTypeResponse,
     RequiredMaterialCreate, RequiredMaterialUpdate, RequiredMaterialResponse
 )
+from modules.materials.services.validation_service import ValidationService, ValidationError, DatabaseConnectionError
+from modules.samples.services.sample_material_service import SampleMaterialService, SampleMaterialServiceError
 import uuid
 from datetime import datetime
 
@@ -628,13 +630,30 @@ def delete_sample_plan(plan_id: int, db: Session = Depends(get_db_samples)):
 
 @router.post("/sample-materials", response_model=SampleRequiredMaterialResponse, status_code=status.HTTP_201_CREATED)
 def create_sample_material(material_data: SampleRequiredMaterialCreate, db: Session = Depends(get_db_samples)):
-    """Create a new sample required material"""
+    """Create a new sample required material with unit_id validation"""
+    # Validate unit_id exists and is active
+    try:
+        if not ValidationService.validate_unit_id(material_data.unit_id):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid unit_id: {material_data.unit_id} (unit not found or inactive)"
+            )
+    except DatabaseConnectionError as e:
+        logger.error(f"Database connection error during unit validation: {e}")
+        raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    
     try:
         new_material = SampleRequiredMaterial(**material_data.model_dump())
         db.add(new_material)
         db.commit()
         db.refresh(new_material)
-        return new_material
+        
+        # Return material with unit details
+        service = SampleMaterialService()
+        return service.get_sample_material_with_unit(new_material.id)
     except Exception as e:
         db.rollback()
         logger.error(f"Sample material creation error: {e}")
@@ -648,26 +667,57 @@ def get_sample_materials(
     limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db_samples)
 ):
-    """Get all sample materials"""
-    query = db.query(SampleRequiredMaterial)
-    if sample_request_id:
-        query = query.filter(SampleRequiredMaterial.sample_request_id == sample_request_id)
-    return query.order_by(SampleRequiredMaterial.id).offset(skip).limit(limit).all()
+    """Get all sample materials with unit details (batch-resolved to avoid N+1 queries)"""
+    try:
+        service = SampleMaterialService()
+        materials = service.get_sample_materials_with_units(
+            sample_request_id=sample_request_id,
+            skip=skip,
+            limit=limit
+        )
+        return materials
+    except DatabaseConnectionError as e:
+        logger.error(f"Database connection error: {e}")
+        raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+    except SampleMaterialServiceError as e:
+        logger.error(f"Sample material service error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve sample materials")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving sample materials: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve sample materials")
 
 
 @router.put("/sample-materials/{material_id}", response_model=SampleRequiredMaterialResponse)
 def update_sample_material(material_id: int, material_data: SampleRequiredMaterialUpdate, db: Session = Depends(get_db_samples)):
-    """Update a sample material"""
+    """Update a sample material with unit_id validation"""
     material = db.query(SampleRequiredMaterial).filter(SampleRequiredMaterial.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="Sample material not found")
+
+    # Validate unit_id if provided
+    if material_data.unit_id is not None:
+        try:
+            if not ValidationService.validate_unit_id(material_data.unit_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid unit_id: {material_data.unit_id} (unit not found or inactive)"
+                )
+        except DatabaseConnectionError as e:
+            logger.error(f"Database connection error during unit validation: {e}")
+            raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
 
     for key, value in material_data.model_dump(exclude_unset=True).items():
         setattr(material, key, value)
 
     db.commit()
     db.refresh(material)
-    return material
+    
+    # Return material with unit details
+    service = SampleMaterialService()
+    return service.get_sample_material_with_unit(material.id)
 
 
 @router.delete("/sample-materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1052,13 +1102,46 @@ def delete_sample_status(status_id: int, db: Session = Depends(get_db_samples)):
 
 @router.post("/variant-materials", response_model=StyleVariantMaterialResponse, status_code=status.HTTP_201_CREATED)
 def create_variant_material(material_data: StyleVariantMaterialCreate, db: Session = Depends(get_db_samples)):
-    """Create a new style variant material"""
+    """Create a new style variant material with unit_id validation"""
+    # Validate unit_id if provided
+    if material_data.unit_id is not None:
+        try:
+            if not ValidationService.validate_unit_id(material_data.unit_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid unit_id: {material_data.unit_id} (unit not found or inactive)"
+                )
+        except DatabaseConnectionError as e:
+            logger.error(f"Database connection error during unit validation: {e}")
+            raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    # Validate weight_unit_id if provided
+    if material_data.weight_unit_id is not None:
+        try:
+            if not ValidationService.validate_unit_id(material_data.weight_unit_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid weight_unit_id: {material_data.weight_unit_id} (unit not found or inactive)"
+                )
+        except DatabaseConnectionError as e:
+            logger.error(f"Database connection error during weight unit validation: {e}")
+            raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+    
     try:
         new_material = StyleVariantMaterial(**material_data.model_dump())
         db.add(new_material)
         db.commit()
         db.refresh(new_material)
-        return new_material
+        
+        # Return material with unit details
+        service = SampleMaterialService()
+        return service.get_variant_material_with_units(new_material.id)
     except Exception as e:
         db.rollback()
         logger.error(f"Variant material creation error: {e}")
@@ -1072,26 +1155,72 @@ def get_variant_materials(
     limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db_samples)
 ):
-    """Get all style variant materials"""
-    query = db.query(StyleVariantMaterial)
-    if style_variant_id:
-        query = query.filter(StyleVariantMaterial.style_variant_id == style_variant_id)
-    return query.order_by(StyleVariantMaterial.id).offset(skip).limit(limit).all()
+    """Get all style variant materials with unit details (batch-resolved to avoid N+1 queries)"""
+    try:
+        service = SampleMaterialService()
+        materials = service.get_variant_materials_with_units(
+            style_variant_id=style_variant_id,
+            skip=skip,
+            limit=limit
+        )
+        return materials
+    except DatabaseConnectionError as e:
+        logger.error(f"Database connection error: {e}")
+        raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+    except SampleMaterialServiceError as e:
+        logger.error(f"Sample material service error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve variant materials")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving variant materials: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve variant materials")
 
 
 @router.put("/variant-materials/{material_id}", response_model=StyleVariantMaterialResponse)
 def update_variant_material(material_id: int, material_data: StyleVariantMaterialUpdate, db: Session = Depends(get_db_samples)):
-    """Update a style variant material"""
+    """Update a style variant material with unit_id validation"""
     material = db.query(StyleVariantMaterial).filter(StyleVariantMaterial.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="Variant material not found")
+
+    # Validate unit_id if provided
+    if material_data.unit_id is not None:
+        try:
+            if not ValidationService.validate_unit_id(material_data.unit_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid unit_id: {material_data.unit_id} (unit not found or inactive)"
+                )
+        except DatabaseConnectionError as e:
+            logger.error(f"Database connection error during unit validation: {e}")
+            raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    # Validate weight_unit_id if provided
+    if material_data.weight_unit_id is not None:
+        try:
+            if not ValidationService.validate_unit_id(material_data.weight_unit_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid weight_unit_id: {material_data.weight_unit_id} (unit not found or inactive)"
+                )
+        except DatabaseConnectionError as e:
+            logger.error(f"Database connection error during weight unit validation: {e}")
+            raise HTTPException(status_code=503, detail="Unit conversion service unavailable")
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
 
     for key, value in material_data.model_dump(exclude_unset=True).items():
         setattr(material, key, value)
 
     db.commit()
     db.refresh(material)
-    return material
+    
+    # Return material with unit details
+    service = SampleMaterialService()
+    return service.get_variant_material_with_units(material.id)
 
 
 @router.delete("/variant-materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)

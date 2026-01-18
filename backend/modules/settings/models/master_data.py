@@ -6,7 +6,20 @@ from core.database import BaseSettings
 # ==================== UoM (Units of Measure) ====================
 
 class UoMCategory(BaseSettings):
-    """UoM Categories - Length, Weight, Volume, Quantity, etc."""
+    """
+    DEPRECATED: UoM Categories - Length, Weight, Volume, Quantity, etc.
+    
+    ⚠️  DEPRECATION WARNING ⚠️
+    This table is DEPRECATED and will be removed in a future version.
+    
+    Use the Unit Conversion System in db-units database instead:
+    - New system provides 35 categories with 288 units
+    - Includes Desi, Textile, and International units
+    - Better performance and standardized conversion factors
+    - Migration guide: /docs/migration-guide-legacy-uom.md
+    
+    Legacy table preserved for backward compatibility only.
+    """
     __tablename__ = "uom_category"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -23,7 +36,20 @@ class UoMCategory(BaseSettings):
 
 
 class UoM(BaseSettings):
-    """Units of Measure - Actual units (Kg, Meter, Piece, etc.)"""
+    """
+    DEPRECATED: Units of Measure - Actual units (Kg, Meter, Piece, etc.)
+    
+    ⚠️  DEPRECATION WARNING ⚠️
+    This table is DEPRECATED and will be removed in a future version.
+    
+    Use the Unit Conversion System in db-units database instead:
+    - New system provides 35 categories with 288 units
+    - Includes Desi, Textile, and International units
+    - Better performance and standardized conversion factors
+    - Migration guide: /docs/migration-guide-legacy-uom.md
+    
+    Legacy table preserved for backward compatibility only.
+    """
     __tablename__ = "uom"
 
     id = Column(Integer, primary_key=True, index=True)

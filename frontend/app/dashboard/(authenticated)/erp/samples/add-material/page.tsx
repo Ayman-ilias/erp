@@ -37,7 +37,8 @@ import { Card } from "@/components/ui/card";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { UoMSelector } from "@/components/uom/uom-selector";
+import { UnitSelector } from "@/components/uom/UnitSelector";
+import { InlineConverter } from "@/components/uom/InlineConverter";
 
 export default function AddMaterialPage() {
   const [materials, setMaterials] = useState<any[]>([]);
@@ -52,7 +53,7 @@ export default function AddMaterialPage() {
   });
   const [formData, setFormData] = useState({
     material_name: "",
-    uom: "",
+    unit_id: undefined as number | undefined,
     material_category: "",
     description: "",
   });
@@ -83,7 +84,8 @@ export default function AddMaterialPage() {
       result = result.filter(
         (m: any) =>
           m.material_name?.toLowerCase().includes(searchLower) ||
-          m.uom?.toLowerCase().includes(searchLower) ||
+          m.unit_name?.toLowerCase().includes(searchLower) ||
+          m.unit_symbol?.toLowerCase().includes(searchLower) ||
           m.material_category?.toLowerCase().includes(searchLower)
       );
     }
@@ -113,6 +115,18 @@ export default function AddMaterialPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.material_name.trim()) {
+      toast.error("Material name is required");
+      return;
+    }
+    
+    if (!formData.unit_id) {
+      toast.error("Unit selection is required");
+      return;
+    }
+    
     try {
       if (editingMaterial) {
         await api.materials.update(editingMaterial.id, formData);
@@ -132,7 +146,12 @@ export default function AddMaterialPage() {
 
   const handleEdit = (material: any) => {
     setEditingMaterial(material);
-    setFormData(material);
+    setFormData({
+      material_name: material.material_name || "",
+      unit_id: material.unit_id || undefined,
+      material_category: material.material_category || "",
+      description: material.description || "",
+    });
     setIsDialogOpen(true);
   };
 
@@ -153,7 +172,7 @@ export default function AddMaterialPage() {
     setEditingMaterial(null);
     setFormData({
       material_name: "",
-      uom: "",
+      unit_id: undefined,
       material_category: "",
       description: "",
     });
@@ -169,7 +188,7 @@ export default function AddMaterialPage() {
   // Export columns configuration
   const exportColumns: ExportColumn[] = [
     { key: "material_name", header: "Material Name" },
-    { key: "uom", header: "UOM" },
+    { key: "unit_symbol", header: "Unit" },
     { key: "material_category", header: "Category" },
     { key: "description", header: "Description" },
   ];
@@ -221,13 +240,22 @@ export default function AddMaterialPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="uom">UOM (Unit of Measurement) *</Label>
-                    <UoMSelector
-                      value={formData.uom}
-                      onChange={(value) => setFormData({ ...formData, uom: value })}
-                      placeholder="Select UOM"
-                      required
-                    />
+                    <Label htmlFor="unit_id">Unit of Measurement *</Label>
+                    <div className="flex items-center gap-2">
+                      <UnitSelector
+                        value={formData.unit_id}
+                        onChange={(unitId) => setFormData({ ...formData, unit_id: unitId })}
+                        placeholder="Select unit..."
+                        className="flex-1"
+                      />
+                      {formData.unit_id && (
+                        <InlineConverter
+                          value={1}
+                          fromUnitId={formData.unit_id}
+                          disabled={!formData.unit_id}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -390,7 +418,7 @@ export default function AddMaterialPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Material Name</TableHead>
-              <TableHead>UOM</TableHead>
+              <TableHead>Unit</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -411,7 +439,15 @@ export default function AddMaterialPage() {
                   <TableCell className="font-medium">
                     {material.material_name}
                   </TableCell>
-                  <TableCell>{material.uom}</TableCell>
+                  <TableCell>
+                    {material.unit_symbol ? (
+                      <span title={material.unit_name}>
+                        {material.unit_symbol}
+                      </span>
+                    ) : (
+                      material.uom || "-"
+                    )}
+                  </TableCell>
                   <TableCell>{material.material_category || "-"}</TableCell>
                   <TableCell>{material.description || "-"}</TableCell>
                   <TableCell className="text-right">

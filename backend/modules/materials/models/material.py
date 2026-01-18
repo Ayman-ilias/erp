@@ -8,7 +8,7 @@ class MaterialMaster(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     material_name = Column(String, nullable=False, index=True, unique=True)
-    uom = Column(String, nullable=False)  # Unit of Measurement (e.g., Kg, Meter, Piece)
+    unit_id = Column(Integer, nullable=False, index=True)  # Reference to units table in db-units (cross-database reference)
     material_category = Column(String, nullable=True)  # Fabric, Trims, Accessories, etc.
     description = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
