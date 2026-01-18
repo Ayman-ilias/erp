@@ -1,0 +1,328 @@
+{
+  "metadata": {
+    "created": "2025-01-18T00:00:00Z",
+    "description": "Complete Memory MCP backup for Southern Apparels ERP project",
+    "version": "1.0.0",
+    "total_entities": 13,
+    "total_relations": 16
+  },
+  "entities": [
+    {
+      "name": "Unit Conversion Frontend Error Handling",
+      "entityType": "ImplementationSolution",
+      "observations": [
+        "Comprehensive error handling for Unit Conversion System frontend components",
+        "Handles 4 main error scenarios: API unavailable, unit data fetch failure, incompatible conversion, invalid unit_id",
+        "UoMErrorHandler service classifies errors into specific types with user-friendly messages",
+        "UnitSelector shows error state with retry functionality when unit data fails to load",
+        "InlineConverter disables when units unavailable, shows conversion errors with conditional retry",
+        "UnitDisplay shows loading, error, and unknown unit states with helpful tooltips",
+        "UoMErrorBoundary catches JavaScript errors in UoM components with recovery options",
+        "Error classification includes network errors, API unavailable, validation errors",
+        "Retry functionality with loading states and attempt counters",
+        "User-friendly error messages with actionable suggestions",
+        "Validates Requirements 13.1, 13.2, 13.3, 13.4, 13.5",
+        "All 20 error handling tests pass including edge cases and integration scenarios"
+      ]
+    },
+    {
+      "name": "UoM Error Types and Messages",
+      "entityType": "QuickReference",
+      "observations": [
+        "UNIT_DATA_FETCH_FAILED: 'Failed to load unit data. Some features may not work properly.'",
+        "CONVERSION_API_UNAVAILABLE: 'Unit conversion service is temporarily unavailable. Please try again.'",
+        "INCOMPATIBLE_UNIT_CONVERSION: 'Cannot convert between units in different categories.'",
+        "INVALID_UNIT_ID: 'The selected unit is not valid or no longer available.'",
+        "MISSING_UNIT_SELECTION: 'Please select a unit before proceeding.'",
+        "NETWORK_ERROR: 'Unable to connect to the unit conversion service.'",
+        "Each error type includes specific suggestions for user action",
+        "Retryable vs non-retryable errors properly classified",
+        "Error context preserved for debugging and logging"
+      ]
+    },
+    {
+      "name": "UoM Component Error States",
+      "entityType": "CodePattern",
+      "observations": [
+        "UnitSelector: Shows error state when error && !isLoading, loading state when isLoading",
+        "Error state includes retry button with 'Retrying...' text when isLoading=true",
+        "InlineConverter: Disables button when units data unavailable, shows error in popover",
+        "Retry button hidden for incompatible conversions and invalid units (non-retryable errors)",
+        "UnitDisplay: Shows loading, error with tooltip, unknown unit with helpful message",
+        "UoMErrorBoundary: Catches JS errors with Try Again, Reload Page, Go Home options",
+        "All components handle loading, error, and success states consistently",
+        "Error messages are user-friendly with technical details in tooltips/dev mode"
+      ]
+    },
+    {
+      "name": "Unit Conversion Integration - Complete Implementation",
+      "entityType": "ImplementationSolution",
+      "observations": [
+        "✅ COMPLETED: Comprehensive Unit Conversion System integration across Southern Apparels ERP",
+        "✅ Task 14.1: Frontend error handling with UoMErrorBoundary, retry mechanisms, user-friendly messages",
+        "✅ Backend: 8 PostgreSQL databases (added db-units and db-sizecolor)",
+        "✅ 30+ measurement categories, 200+ units including Desi (Tola, Seer, Maund, Bigha, Lakh, Crore)",
+        "✅ Textile units: GSM, Denier, Tex, Momme, Ounce per square yard",
+        "✅ International units: kg, meter, piece, liter with proper conversions",
+        "✅ Frontend components: UnitSelector, InlineConverter, UnitDisplay with error boundaries",
+        "✅ Form integrations: MaterialMaster, SampleRequiredMaterials, StyleVariantMaterials",
+        "✅ Cross-database resolution with caching and batch operations",
+        "✅ Audit trail: UnitChangeAudit model with migration/conversion logging",
+        "✅ Migration scripts with data preservation and rollback capabilities",
+        "✅ Comprehensive test coverage: unit tests, property-based tests, integration tests",
+        "✅ Error handling: API unavailable, unit fetch failure, incompatible conversions, invalid unit_id",
+        "✅ Performance optimizations: React Query caching, debounced conversions, batch resolution",
+        "Conversion formula: target_value = source_value * (source_factor / target_factor)",
+        "Precision: 6 decimal places during conversion, 2 for display",
+        "Git commit: 3453dce - feat: Complete Unit Conversion Integration with comprehensive error handling"
+      ]
+    },
+    {
+      "name": "Size & Color Master System - Redesigned",
+      "entityType": "ImplementationSolution",
+      "observations": [
+        "✅ COMPLETED: Complete redesign of Size & Color Master system",
+        "✅ New database: db-sizecolor (8th database in architecture)",
+        "✅ Universal Colors: Pantone TCX/TPX codes, RGB, Hex values",
+        "✅ H&M Colors: Proprietary 5-digit codes (XX-XXX format) with color groups",
+        "✅ Garment Types with measurement specifications",
+        "✅ Size Master with gender, age group, fit type filtering",
+        "✅ Sample color/size selections with buyer usage tracking",
+        "✅ Frontend components: ColorSelector, SizeSelector with SearchableSelect",
+        "✅ React Query hooks: useUniversalColors, useHMColors, useGarmentTypes, useSizes",
+        "✅ Error handling and debugging capabilities added",
+        "✅ Integration with Sample Development form",
+        "Models: UniversalColor, HMColorGroup, HMColor, GarmentType, GarmentMeasurementSpec, SizeMaster, SizeMeasurement",
+        "API endpoints: /api/v1/sizecolor/* for all CRUD operations",
+        "Search functionality: search+dropdown+add new for all selectors"
+      ]
+    },
+    {
+      "name": "Multi-Company Settings Module",
+      "entityType": "ImplementationSolution",
+      "observations": [
+        "✅ COMPLETED: Multi-company support replacing single company profile",
+        "✅ Company CRUD: Create, Read, Update, Delete multiple companies",
+        "✅ Logo upload/serving: UUID filenames, CORS headers, file validation",
+        "✅ Branch-company linking: company_id foreign key with dropdown selection",
+        "✅ Country and Port models: ISO codes, UN/LOCODE, 50+ countries, 100+ ports",
+        "✅ UoM enhancements: Standard units seeded, conversion validation",
+        "✅ Frontend: Company list page, add company dialog, logo preview",
+        "✅ API consistency: Standardized error responses, authentication middleware",
+        "✅ React Query integration: useCompanies, useCreateCompany mutations",
+        "✅ TypeScript interfaces: Company, CompanyCreate, CompanyUpdate, Branch updates",
+        "Logo storage: backend/uploads/company_logos/ with UUID filenames",
+        "API endpoints: /api/v1/settings/companies, /api/v1/settings/branches",
+        "Error handling: Network errors, validation errors, loading states"
+      ]
+    },
+    {
+      "name": "Sample Schema Validation Fix",
+      "entityType": "ImplementationSolution",
+      "observations": [
+        "✅ COMPLETED: Pydantic v2 field validators for sample schemas",
+        "✅ ply field: number → string conversion with @field_validator",
+        "✅ decorative_part: string → list conversion (comma-separated)",
+        "✅ additional_instruction: string → list conversion (newline-separated)",
+        "✅ Database migration: fix_decorative_part_additional_instruction_schema.py",
+        "✅ Frontend normalization: TypeScript types updated for dual input support",
+        "✅ Test coverage: Unit tests, integration tests, property-based tests",
+        "✅ Backup and rollback procedures implemented",
+        "Validator pattern: @field_validator('field', mode='before') for preprocessing",
+        "Migration location: backend/migrations/fix_decorative_part_additional_instruction_schema.py",
+        "Frontend files: Sample request forms updated with data normalization"
+      ]
+    },
+    {
+      "name": "Comprehensive Error Handling System",
+      "entityType": "ImplementationSolution",
+      "observations": [
+        "✅ COMPLETED: Multi-layer error handling across frontend and backend",
+        "✅ UoMErrorBoundary: React error boundary for UoM components",
+        "✅ UoMErrorHandler service: Error classification and user-friendly messages",
+        "✅ Retry mechanisms: Configurable retry with loading states and attempt counters",
+        "✅ Error types: API unavailable, unit fetch failure, incompatible conversion, invalid unit_id",
+        "✅ Graceful degradation: Components remain functional when services unavailable",
+        "✅ Test coverage: 20+ error handling tests covering all scenarios",
+        "✅ Backend error handling: db-units connection failure, unit not found, migration validation",
+        "✅ Logging: Comprehensive error logging with context preservation",
+        "Error classification: Retryable vs non-retryable errors",
+        "User feedback: Clear error messages with actionable suggestions",
+        "Recovery options: Retry buttons, fallback states, alternative workflows"
+      ]
+    },
+    {
+      "name": "Property-Based Testing Strategy",
+      "entityType": "TestingSolution",
+      "observations": [
+        "✅ IMPLEMENTED: Comprehensive property-based testing with fast-check",
+        "✅ 24+ property tests covering universal correctness properties",
+        "✅ Test categories: Unit conversion accuracy, data preservation, API consistency",
+        "✅ Desi units testing: Tola, Seer, Maund conversions with property validation",
+        "✅ Textile units testing: GSM, Denier, Tex, Momme conversion properties",
+        "✅ International units testing: kg, meter, piece, liter conversion accuracy",
+        "✅ Migration testing: Data preservation, completeness, rollback properties",
+        "✅ Error handling testing: Invalid inputs, boundary conditions, edge cases",
+        "✅ Performance testing: Cache efficiency, search performance, conversion speed",
+        "Test format: **Property X: Description** **Validates: Requirements X.Y**",
+        "Location: frontend/src/test/properties/*.test.ts",
+        "Integration: Linked to specific requirements for traceability",
+        "Execution: 100+ iterations per property test for thorough validation"
+      ]
+    },
+    {
+      "name": "Database Architecture - 8 Database System",
+      "entityType": "DatabaseSolution",
+      "observations": [
+        "✅ UPDATED: Multi-database architecture expanded to 8 PostgreSQL databases",
+        "✅ Original 6: clients, samples, users, orders, merchandiser, settings",
+        "✅ Added db-units: UoM categories, units, conversion factors, audit logs",
+        "✅ Added db-sizecolor: Universal colors, H&M colors, garment types, size master",
+        "✅ Cross-database references: Integer IDs without foreign keys",
+        "✅ Application-layer validation: Reference integrity in services",
+        "✅ Connection management: Separate SessionLocal and Base for each database",
+        "✅ Migration strategy: Individual migration scripts per database",
+        "✅ Backup procedures: Database-specific backup and restore scripts",
+        "Configuration: DATABASE_UNITS_URL, DATABASE_SIZECOLOR_URL in config.py",
+        "Dependencies: get_db_units(), get_db_sizecolor() for dependency injection",
+        "Models: BaseUnits, BaseSizeColor for declarative model inheritance"
+      ]
+    },
+    {
+      "name": "Git Repository Status - Latest Push",
+      "entityType": "QuickReference",
+      "observations": [
+        "✅ PUSHED: All changes committed and pushed to GitHub",
+        "Commit: 3453dce - feat: Complete Unit Conversion Integration with comprehensive error handling",
+        "149 files changed, 43,630 insertions(+), 3,952 deletions(-)",
+        "Repository: https://github.com/Ayman-ilias/erp.git",
+        "Branch: main",
+        "✅ Multi-device access: Clone from any device to get all latest changes",
+        "✅ MCP Server data: All steering rules and configurations included",
+        "✅ Kiro & Claude configurations: .kiro/ directory with all settings",
+        "✅ Memory MCP data: Stored at C:/Users/MSI/.kiro/memory-data (shared)",
+        "Key additions: Unit Conversion System, Size & Color Master, Multi-company support",
+        "Database backups: backups/ directory with all database dumps",
+        "Migration scripts: backend/migrations/ with all schema changes",
+        "Test coverage: frontend/src/test/ with comprehensive test suites"
+      ]
+    },
+    {
+      "name": "Multi-Device Development Setup",
+      "entityType": "ProjectRule",
+      "observations": [
+        "✅ Repository: https://github.com/Ayman-ilias/erp.git",
+        "✅ Clone command: git clone https://github.com/Ayman-ilias/erp.git",
+        "✅ MCP Server configs: .kiro/settings/mcp.json (workspace-level)",
+        "✅ Steering rules: .kiro/steering/*.md (project context, memory usage, MCP rules)",
+        "✅ Memory MCP: Shared knowledge graph at C:/Users/MSI/.kiro/memory-data",
+        "✅ Environment setup: .env.example with all required variables",
+        "✅ Docker setup: docker-compose.yml with 8 PostgreSQL databases",
+        "✅ Database initialization: backend/init_data.py and migration scripts",
+        "✅ Seed data: backend/migrations/seed_*.py scripts",
+        "Setup steps: 1) Clone repo, 2) Copy .env.example to .env, 3) docker-compose up -d, 4) Run migrations",
+        "All configurations preserved: Kiro settings, Claude settings, MCP servers, steering rules"
+      ]
+    },
+    {
+      "name": "MCP Server Configuration - Complete Setup",
+      "entityType": "QuickReference",
+      "observations": [
+        "✅ Memory MCP: Shared knowledge graph (C:/Users/MSI/.kiro/memory-data)",
+        "✅ Filesystem MCP: File operations for token efficiency",
+        "✅ Fetch MCP: HTTP requests and web content",
+        "✅ Puppeteer MCP: Browser automation and testing",
+        "✅ Perplexity AI MCP: Advanced search and research",
+        "Workspace config: .kiro/settings/mcp.json",
+        "User config: C:/Users/MSI/.kiro/settings/mcp.json",
+        "Auto-approve: All tools configured for seamless operation",
+        "Steering rules: .kiro/steering/mcp-usage-rules.md",
+        "Memory usage: .kiro/steering/memory-mcp-guide.md",
+        "Project context: .kiro/steering/project-context.md",
+        "Integration rules: .kiro/steering/claude-code-integration.md"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "Unit Conversion Frontend Error Handling",
+      "relationType": "implements",
+      "to": "Unit Conversion Integration"
+    },
+    {
+      "from": "Unit Conversion Frontend Error Handling",
+      "relationType": "uses",
+      "to": "UoM Component Error States"
+    },
+    {
+      "from": "UoM Error Types and Messages",
+      "relationType": "documents",
+      "to": "Unit Conversion Frontend Error Handling"
+    },
+    {
+      "from": "UoM Component Error States",
+      "relationType": "implements",
+      "to": "Frontend Architecture"
+    },
+    {
+      "from": "Unit Conversion Integration - Complete Implementation",
+      "relationType": "is_feature_of",
+      "to": "Southern Apparels ERP"
+    },
+    {
+      "from": "Size & Color Master System - Redesigned",
+      "relationType": "is_feature_of",
+      "to": "Southern Apparels ERP"
+    },
+    {
+      "from": "Multi-Company Settings Module",
+      "relationType": "is_feature_of",
+      "to": "Southern Apparels ERP"
+    },
+    {
+      "from": "Sample Schema Validation Fix",
+      "relationType": "is_feature_of",
+      "to": "Southern Apparels ERP"
+    },
+    {
+      "from": "Unit Conversion Integration - Complete Implementation",
+      "relationType": "uses",
+      "to": "Database Architecture - 8 Database System"
+    },
+    {
+      "from": "Size & Color Master System - Redesigned",
+      "relationType": "uses",
+      "to": "Database Architecture - 8 Database System"
+    },
+    {
+      "from": "Unit Conversion Integration - Complete Implementation",
+      "relationType": "implements",
+      "to": "Comprehensive Error Handling System"
+    },
+    {
+      "from": "Unit Conversion Integration - Complete Implementation",
+      "relationType": "implements",
+      "to": "Property-Based Testing Strategy"
+    },
+    {
+      "from": "Size & Color Master System - Redesigned",
+      "relationType": "implements",
+      "to": "Property-Based Testing Strategy"
+    },
+    {
+      "from": "Database Architecture - 8 Database System",
+      "relationType": "enhances",
+      "to": "Backend Architecture"
+    },
+    {
+      "from": "Comprehensive Error Handling System",
+      "relationType": "enhances",
+      "to": "Frontend Architecture"
+    },
+    {
+      "from": "Property-Based Testing Strategy",
+      "relationType": "validates",
+      "to": "Unit Conversion Integration - Complete Implementation"
+    }
+  ]
+}
