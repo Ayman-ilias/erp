@@ -99,8 +99,8 @@ interface SizeSelectorProps {
 // CONSTANTS
 // ============================================================================
 
-const GENDERS: GenderEnum[] = ["Male", "Female", "Unisex"];
-const AGE_GROUPS: AgeGroupEnum[] = ["Adult", "Teen", "Kids", "Toddler", "Infant"];
+const GENDERS: GenderEnum[] = ["Male", "Female", "Unisex", "Kids Boy", "Kids Girl", "Kids Unisex", "Infant", "Toddler"];
+const AGE_GROUPS: AgeGroupEnum[] = ["Newborn (0-3 months)", "Infant (3-12 months)", "Toddler (1-3 years)", "Kids (4-12 years)", "Teen (13-17 years)", "Adult (18+)", "All Ages"];
 const FIT_TYPES: FitTypeEnum[] = ["Regular", "Slim", "Relaxed", "Oversized", "Fitted", "Loose", "Athletic", "Tapered"];
 
 // ============================================================================

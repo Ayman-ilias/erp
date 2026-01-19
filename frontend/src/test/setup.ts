@@ -7,6 +7,27 @@ afterEach(() => {
   cleanup()
 })
 
+// Mock ResizeObserver
+class MockResizeObserver {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+}
+
+global.ResizeObserver = MockResizeObserver as any
+
+// Mock IntersectionObserver
+class MockIntersectionObserver {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+}
+
+global.IntersectionObserver = MockIntersectionObserver as any
+
+// Mock scrollIntoView
+Element.prototype.scrollIntoView = vi.fn()
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({

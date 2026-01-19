@@ -72,7 +72,7 @@ export type FinishTypeEnum =
   | "Enzyme Washed"
   | "Stone Washed";
 
-export type GenderEnum = "Male" | "Female" | "Unisex";
+export type GenderEnum = "Male" | "Female" | "Unisex" | "Kids Boy" | "Kids Girl" | "Kids Unisex" | "Infant" | "Toddler";
 
 export type FitTypeEnum =
   | "Regular"
@@ -85,11 +85,13 @@ export type FitTypeEnum =
   | "Tapered";
 
 export type AgeGroupEnum =
-  | "Adult"
-  | "Teen"
-  | "Kids"
-  | "Toddler"
-  | "Infant";
+  | "Newborn (0-3 months)"
+  | "Infant (3-12 months)"
+  | "Toddler (1-3 years)"
+  | "Kids (4-12 years)"
+  | "Teen (13-17 years)"
+  | "Adult (18+)"
+  | "All Ages";
 
 // ============================================================================
 // TYPE DEFINITIONS - UNIVERSAL COLORS
@@ -97,7 +99,8 @@ export type AgeGroupEnum =
 
 export interface UniversalColor {
   id: number;
-  name: string;
+  color_name: string;
+  display_name?: string;
   color_code: string;
   hex_code: string;
   rgb_r?: number;
@@ -105,11 +108,14 @@ export interface UniversalColor {
   rgb_b?: number;
   pantone_code?: string;
   tcx_code?: string;
+  tpx_code?: string;
   color_family?: ColorFamilyEnum;
   color_type?: ColorTypeEnum;
   color_value?: ColorValueEnum;
   finish_type?: FinishTypeEnum;
   description?: string;
+  season?: string;
+  year?: number;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -117,12 +123,13 @@ export interface UniversalColor {
 
 export interface UniversalColorForSelector {
   id: number;
-  name: string;
+  color_name: string;
   color_code: string;
   hex_code: string;
   pantone_code?: string;
   tcx_code?: string;
   color_family?: ColorFamilyEnum;
+  label: string;
 }
 
 // ============================================================================
@@ -156,8 +163,9 @@ export interface HMColorForSelector {
   id: number;
   hm_code: string;
   hm_name: string;
-  group_name: string;
+  group_name?: string;
   hex_code?: string;
+  label: string;
 }
 
 // ============================================================================
@@ -188,7 +196,8 @@ export interface GarmentTypeForSelector {
   id: number;
   name: string;
   code: string;
-  category: string;
+  category?: string;
+  label: string;
 }
 
 // ============================================================================
@@ -230,10 +239,12 @@ export interface SizeForSelector {
   size_code: string;
   size_name: string;
   size_label?: string;
+  garment_type_id: number;
   garment_type_name: string;
-  gender: GenderEnum;
-  age_group: AgeGroupEnum;
-  fit_type?: FitTypeEnum;
+  gender: string;
+  age_group: string;
+  fit_type: string;
+  label: string;
   measurements_summary?: string;
 }
 

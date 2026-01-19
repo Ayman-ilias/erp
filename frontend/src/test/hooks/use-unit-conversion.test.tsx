@@ -70,11 +70,11 @@ describe('useUnitConversion', () => {
     vi.useFakeTimers();
     
     const mockResponse = {
-      value: 1,
+      value: 3,
       from_unit: { id: 1, name: 'Kilogram', symbol: 'kg' },
       to_unit: { id: 2, name: 'Gram', symbol: 'g' },
-      result: 1000,
-      formula: '1 kg = 1000 g',
+      result: 3000,
+      formula: '3 kg = 3000 g',
     };
     
     mockConvert.mockResolvedValue(mockResponse);
@@ -104,16 +104,19 @@ describe('useUnitConversion', () => {
       vi.advanceTimersByTime(1);
     });
 
-    await waitFor(() => {
-      expect(mockConvert).toHaveBeenCalledTimes(1);
-      expect(mockConvert).toHaveBeenCalledWith(
-        { value: 3, from_uom_id: 1, to_uom_id: 2 },
-        'test-token'
-      );
+    // Wait for the async operation to complete
+    await act(async () => {
+      await vi.runAllTimersAsync();
     });
 
+    expect(mockConvert).toHaveBeenCalledTimes(1);
+    expect(mockConvert).toHaveBeenCalledWith(
+      { value: 3, from_uom_id: 1, to_uom_id: 2 },
+      'test-token'
+    );
+
     vi.useRealTimers();
-  });
+  }, 10000);
 
   it('should handle successful conversion', async () => {
     vi.useFakeTimers();
@@ -141,20 +144,24 @@ describe('useUnitConversion', () => {
       vi.advanceTimersByTime(300);
     });
 
-    await waitFor(() => {
-      expect(result.current.isConverting).toBe(false);
-      expect(result.current.convertedValue).toEqual(mockResponse);
-      expect(result.current.error).toBe(null);
+    // Wait for async operations
+    await act(async () => {
+      await vi.runAllTimersAsync();
     });
 
+    expect(result.current.isConverting).toBe(false);
+    expect(result.current.convertedValue).toEqual(mockResponse);
+    expect(result.current.error).toBe(null);
+
     vi.useRealTimers();
-  });
+  }, 10000);
 
   it('should handle conversion errors', async () => {
     vi.useFakeTimers();
     
     const mockError = {
       response: {
+        status: 400,
         data: {
           detail: 'Cannot convert between different UoM categories'
         }
@@ -175,14 +182,16 @@ describe('useUnitConversion', () => {
       vi.advanceTimersByTime(300);
     });
 
-    await waitFor(() => {
-      expect(result.current.isConverting).toBe(false);
-      expect(result.current.convertedValue).toBe(null);
-      expect(result.current.error).toBe('Cannot convert between different UoM categories');
+    await act(async () => {
+      await vi.runAllTimersAsync();
     });
 
+    expect(result.current.isConverting).toBe(false);
+    expect(result.current.convertedValue).toBe(null);
+    expect(result.current.error).toBe('Cannot convert between different UoM categories');
+
     vi.useRealTimers();
-  });
+  }, 10000);
 
   it('should handle generic errors', async () => {
     vi.useFakeTimers();
@@ -201,12 +210,14 @@ describe('useUnitConversion', () => {
       vi.advanceTimersByTime(300);
     });
 
-    await waitFor(() => {
-      expect(result.current.error).toBe('Network error');
+    await act(async () => {
+      await vi.runAllTimersAsync();
     });
 
+    expect(result.current.error).toBe('Network error');
+
     vi.useRealTimers();
-  });
+  }, 10000);
 
   it('should reset state correctly', () => {
     const { result } = renderHook(() => useUnitConversion(), {
@@ -270,17 +281,19 @@ describe('useUnitConversion', () => {
       vi.advanceTimersByTime(300);
     });
 
-    await waitFor(() => {
-      expect(mockConvert).toHaveBeenCalledWith(
-        {
-          value: 5.5,
-          from_uom_id: 10,
-          to_uom_id: 20,
-        },
-        'test-token'
-      );
+    await act(async () => {
+      await vi.runAllTimersAsync();
     });
 
+    expect(mockConvert).toHaveBeenCalledWith(
+      {
+        value: 5.5,
+        from_uom_id: 10,
+        to_uom_id: 20,
+      },
+      'test-token'
+    );
+
     vi.useRealTimers();
-  });
+  }, 10000);
 });

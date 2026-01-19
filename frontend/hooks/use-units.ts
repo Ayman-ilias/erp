@@ -6,7 +6,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { QUERY_KEYS } from "@/query.config";
 import { unitService, settingsService } from "@/services/api";
 import { useAuth } from "@/lib/auth-context";
@@ -591,7 +591,7 @@ export function useUnitConversion() {
   const [error, setError] = useState<string | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const convert = useCallback(async ({ value, fromUnitId, toUnitId }: ConversionRequest) => {
+  const convert = useCallback(({ value, fromUnitId, toUnitId }: ConversionRequest) => {
     // Clear any existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -677,6 +677,11 @@ export function useUnitConversion() {
     setIsConverting(false);
     setConvertedValue(null);
     setError(null);
+  }, [cleanup]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return cleanup;
   }, [cleanup]);
 
   return {

@@ -176,7 +176,7 @@ export function ColorSelector({
             return color.hex_code?.toLowerCase().includes(searchLower);
           case "rgb":
             // Search by name or code for RGB
-            return color.name.toLowerCase().includes(searchLower) ||
+            return color.color_name.toLowerCase().includes(searchLower) ||
                    color.color_code.toLowerCase().includes(searchLower);
           default:
             return true;
@@ -220,9 +220,9 @@ export function ColorSelector({
         id: color.id,
         type: "universal",
         code: color.pantone_code || color.tcx_code || color.color_code,
-        name: color.name,
+        name: color.color_name,
         hex_code: color.hex_code,
-        display_name: `${color.name} (${color.pantone_code || color.tcx_code || color.color_code})`,
+        display_name: `${color.color_name} (${color.pantone_code || color.tcx_code || color.color_code})`,
       };
       onColorsChange([...selectedColors, newColor]);
     }
@@ -426,7 +426,7 @@ export function ColorSelector({
                   <div className="flex items-center gap-3">
                     {renderColorSwatch(universalColorByCode.hex_code, "lg")}
                     <div className="flex-1">
-                      <div className="font-medium">{universalColorByCode.name}</div>
+                      <div className="font-medium">{universalColorByCode.color_name}</div>
                       <div className="text-sm text-muted-foreground">
                         {universalColorByCode.pantone_code && <span className="mr-3">Pantone: {universalColorByCode.pantone_code}</span>}
                         {universalColorByCode.tcx_code && <span className="mr-3">TCX: {universalColorByCode.tcx_code}</span>}
@@ -481,7 +481,7 @@ export function ColorSelector({
                         >
                           {renderColorSwatch(color.hex_code, "md")}
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{color.name}</div>
+                            <div className="text-sm font-medium truncate">{color.color_name}</div>
                             <div className="text-xs text-muted-foreground truncate">
                               {color.pantone_code || color.tcx_code || color.color_code}
                             </div>

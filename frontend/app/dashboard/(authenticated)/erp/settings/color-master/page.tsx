@@ -211,7 +211,7 @@ export default function ColorMasterPage() {
       const term = universalSearchTerm.toLowerCase();
       filtered = filtered.filter(
         (c) =>
-          c.name.toLowerCase().includes(term) ||
+          c.color_name.toLowerCase().includes(term) ||
           c.color_code.toLowerCase().includes(term) ||
           (c.pantone_code?.toLowerCase().includes(term)) ||
           (c.tcx_code?.toLowerCase().includes(term)) ||
@@ -277,7 +277,7 @@ export default function ColorMasterPage() {
   const handleEditUniversal = (color: UniversalColor) => {
     setEditingUniversal(color);
     setUniversalFormData({
-      name: color.name,
+      name: color.color_name,
       hex_code: color.hex_code,
       pantone_code: color.pantone_code || "",
       tcx_code: color.tcx_code || "",
@@ -859,7 +859,7 @@ export default function ColorMasterPage() {
                           title={color.hex_code}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{color.name}</TableCell>
+                      <TableCell className="font-medium">{color.color_name}</TableCell>
                       <TableCell>
                         {color.pantone_code && (
                           <code className="px-1.5 py-0.5 bg-muted rounded text-xs">
@@ -1036,7 +1036,7 @@ export default function ColorMasterPage() {
                                   className="w-3 h-3 rounded-full border"
                                   style={{ backgroundColor: color.hex_code }}
                                 />
-                                {color.name}
+                                {color.color_name}
                               </div>
                             </SelectItem>
                           ))}
@@ -1146,7 +1146,7 @@ export default function ColorMasterPage() {
                               className="w-4 h-4 rounded-full border"
                               style={{ backgroundColor: color.universal_color.hex_code }}
                             />
-                            <span className="text-sm">{color.universal_color.name}</span>
+                            <span className="text-sm">{color.universal_color.color_name}</span>
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-sm">Not linked</span>

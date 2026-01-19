@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect, type SelectOption } from "@/components/ui/searchable-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -63,36 +64,93 @@ import {
   type AgeGroupEnum,
 } from "@/hooks/use-sizecolor";
 
-// Gender options
-const genderOptions: { value: GenderEnum; label: string; color: string }[] = [
+// Gender options with colors for badges
+const genderOptionsWithColors: { value: GenderEnum; label: string; color: string }[] = [
   { value: "Male", label: "Male", color: "bg-blue-100 text-blue-800" },
   { value: "Female", label: "Female", color: "bg-pink-100 text-pink-800" },
   { value: "Unisex", label: "Unisex", color: "bg-purple-100 text-purple-800" },
+  { value: "Kids Boy", label: "Kids Boy", color: "bg-blue-50 text-blue-700" },
+  { value: "Kids Girl", label: "Kids Girl", color: "bg-pink-50 text-pink-700" },
+  { value: "Kids Unisex", label: "Kids Unisex", color: "bg-purple-50 text-purple-700" },
+  { value: "Infant", label: "Infant", color: "bg-yellow-100 text-yellow-800" },
+  { value: "Toddler", label: "Toddler", color: "bg-green-100 text-green-800" },
 ];
 
-// Fit type options
-const fitTypeOptions: { value: FitTypeEnum; label: string }[] = [
-  { value: "Regular", label: "Regular" },
-  { value: "Slim", label: "Slim" },
-  { value: "Relaxed", label: "Relaxed" },
-  { value: "Oversized", label: "Oversized" },
-  { value: "Fitted", label: "Fitted" },
-  { value: "Loose", label: "Loose" },
-  { value: "Athletic", label: "Athletic" },
-  { value: "Tapered", label: "Tapered" },
+// Default Gender options for SearchableSelect
+const defaultGenderOptions: SelectOption[] = [
+  { value: "Male", label: "Male", description: "Adult male sizing" },
+  { value: "Female", label: "Female", description: "Adult female sizing" },
+  { value: "Unisex", label: "Unisex", description: "Gender-neutral sizing" },
+  { value: "Kids Boy", label: "Kids Boy", description: "Children's boy sizing" },
+  { value: "Kids Girl", label: "Kids Girl", description: "Children's girl sizing" },
+  { value: "Kids Unisex", label: "Kids Unisex", description: "Children's unisex sizing" },
+  { value: "Infant", label: "Infant", description: "0-12 months" },
+  { value: "Toddler", label: "Toddler", description: "1-3 years" },
 ];
 
-// Age group options
-const ageGroupOptions: { value: AgeGroupEnum; label: string }[] = [
-  { value: "Adult", label: "Adult" },
-  { value: "Teen", label: "Teen" },
-  { value: "Kids", label: "Kids" },
-  { value: "Toddler", label: "Toddler" },
-  { value: "Infant", label: "Infant" },
+// Default Fit type options for SearchableSelect
+const defaultFitTypeOptions: SelectOption[] = [
+  { value: "Regular", label: "Regular", description: "Standard fit" },
+  { value: "Slim", label: "Slim", description: "Fitted cut" },
+  { value: "Relaxed", label: "Relaxed", description: "Comfortable loose fit" },
+  { value: "Oversized", label: "Oversized", description: "Extra room throughout" },
+  { value: "Fitted", label: "Fitted", description: "Body-hugging fit" },
+  { value: "Loose", label: "Loose", description: "Generous room" },
+  { value: "Athletic", label: "Athletic", description: "Sports performance fit" },
+  { value: "Tapered", label: "Tapered", description: "Narrowing toward bottom" },
+  { value: "Skinny", label: "Skinny", description: "Very tight fit" },
+  { value: "Wide", label: "Wide", description: "Extra wide cut" },
 ];
 
-// Standard size names
-const sizeNames = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"];
+// Default Age group options for SearchableSelect
+const defaultAgeGroupOptions: SelectOption[] = [
+  { value: "Newborn (0-3 months)", label: "Newborn", description: "0-3 months" },
+  { value: "Infant (3-12 months)", label: "Infant", description: "3-12 months" },
+  { value: "Toddler (1-3 years)", label: "Toddler", description: "1-3 years" },
+  { value: "Kids (4-12 years)", label: "Kids", description: "4-12 years" },
+  { value: "Teen (13-17 years)", label: "Teen", description: "13-17 years" },
+  { value: "Adult (18+)", label: "Adult", description: "18 and over" },
+  { value: "All Ages", label: "All Ages", description: "Universal sizing" },
+];
+
+// Default Size name options for SearchableSelect
+const defaultSizeNameOptions: SelectOption[] = [
+  { value: "XXS", label: "XXS", description: "Extra Extra Small" },
+  { value: "XS", label: "XS", description: "Extra Small" },
+  { value: "S", label: "S", description: "Small" },
+  { value: "M", label: "M", description: "Medium" },
+  { value: "L", label: "L", description: "Large" },
+  { value: "XL", label: "XL", description: "Extra Large" },
+  { value: "XXL", label: "XXL", description: "2X Large" },
+  { value: "XXXL", label: "XXXL", description: "3X Large" },
+  { value: "4XL", label: "4XL", description: "4X Large" },
+  { value: "5XL", label: "5XL", description: "5X Large" },
+  { value: "ONE SIZE", label: "ONE SIZE", description: "Universal fit" },
+  { value: "0", label: "0", description: "Numeric size 0" },
+  { value: "2", label: "2", description: "Numeric size 2" },
+  { value: "4", label: "4", description: "Numeric size 4" },
+  { value: "6", label: "6", description: "Numeric size 6" },
+  { value: "8", label: "8", description: "Numeric size 8" },
+  { value: "10", label: "10", description: "Numeric size 10" },
+  { value: "12", label: "12", description: "Numeric size 12" },
+  { value: "14", label: "14", description: "Numeric size 14" },
+  { value: "16", label: "16", description: "Numeric size 16" },
+];
+
+// Legacy filter options (for backward compatibility with filters)
+const genderFilterOptions = [
+  { value: "Male", label: "Male" },
+  { value: "Female", label: "Female" },
+  { value: "Unisex", label: "Unisex" },
+];
+
+const ageGroupFilterOptions = [
+  { value: "Adult (18+)", label: "Adult" },
+  { value: "Teen (13-17 years)", label: "Teen" },
+  { value: "Kids (4-12 years)", label: "Kids" },
+  { value: "Toddler (1-3 years)", label: "Toddler" },
+  { value: "Infant (3-12 months)", label: "Infant" },
+];
 
 export default function SizeMasterPage() {
   const { user } = useAuth();
@@ -113,13 +171,25 @@ export default function SizeMasterPage() {
   const [selectedSizeForMeasurement, setSelectedSizeForMeasurement] = useState<SizeMaster | null>(null);
   const [selectedGarmentTypeId, setSelectedGarmentTypeId] = useState<number | null>(null);
 
+  // Custom options state (for user-added values)
+  const [customSizeNames, setCustomSizeNames] = useState<SelectOption[]>([]);
+  const [customGenders, setCustomGenders] = useState<SelectOption[]>([]);
+  const [customAgeGroups, setCustomAgeGroups] = useState<SelectOption[]>([]);
+  const [customFitTypes, setCustomFitTypes] = useState<SelectOption[]>([]);
+
+  // Combined options (defaults + custom)
+  const sizeNameOptions = useMemo(() => [...defaultSizeNameOptions, ...customSizeNames], [customSizeNames]);
+  const genderOptions = useMemo(() => [...defaultGenderOptions, ...customGenders], [customGenders]);
+  const ageGroupOptions = useMemo(() => [...defaultAgeGroupOptions, ...customAgeGroups], [customAgeGroups]);
+  const fitTypeOptions = useMemo(() => [...defaultFitTypeOptions, ...customFitTypes], [customFitTypes]);
+
   // Size form
   const [sizeFormData, setSizeFormData] = useState({
     garment_type_id: 0,
     size_name: "",
     size_label: "",
     gender: "Unisex" as GenderEnum,
-    age_group: "Adult" as AgeGroupEnum,
+    age_group: "Adult (18+)" as AgeGroupEnum,
     fit_type: "Regular" as FitTypeEnum,
     size_order: 0,
     description: "",
@@ -193,7 +263,7 @@ export default function SizeMasterPage() {
 
   // Get gender badge color
   const getGenderBadge = (gender: GenderEnum) => {
-    const option = genderOptions.find(o => o.value === gender);
+    const option = genderOptionsWithColors.find(o => o.value === gender);
     return option || { label: gender, color: "bg-gray-100 text-gray-800" };
   };
 
@@ -265,13 +335,42 @@ export default function SizeMasterPage() {
       size_name: "",
       size_label: "",
       gender: "Unisex",
-      age_group: "Adult",
+      age_group: "Adult (18+)",
       fit_type: "Regular",
       size_order: 0,
       description: "",
       is_active: true,
     });
     setSelectedGarmentTypeId(null);
+  };
+
+  // Handlers for adding new custom options
+  const handleAddSizeName = (value: string) => {
+    const newOption: SelectOption = { value, label: value, description: "Custom size" };
+    setCustomSizeNames(prev => [...prev, newOption]);
+    setSizeFormData(prev => ({ ...prev, size_name: value }));
+    toast.success(`Added new size name: ${value}`);
+  };
+
+  const handleAddGender = (value: string) => {
+    const newOption: SelectOption = { value, label: value, description: "Custom gender category" };
+    setCustomGenders(prev => [...prev, newOption]);
+    setSizeFormData(prev => ({ ...prev, gender: value as GenderEnum }));
+    toast.success(`Added new gender: ${value}`);
+  };
+
+  const handleAddAgeGroup = (value: string) => {
+    const newOption: SelectOption = { value, label: value, description: "Custom age group" };
+    setCustomAgeGroups(prev => [...prev, newOption]);
+    setSizeFormData(prev => ({ ...prev, age_group: value as AgeGroupEnum }));
+    toast.success(`Added new age group: ${value}`);
+  };
+
+  const handleAddFitType = (value: string) => {
+    const newOption: SelectOption = { value, label: value, description: "Custom fit type" };
+    setCustomFitTypes(prev => [...prev, newOption]);
+    setSizeFormData(prev => ({ ...prev, fit_type: value as FitTypeEnum }));
+    toast.success(`Added new fit type: ${value}`);
   };
 
   // Garment type handlers
@@ -516,7 +615,7 @@ export default function SizeMasterPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Genders</SelectItem>
-                  {genderOptions.map((opt) => (
+                  {genderFilterOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -529,7 +628,7 @@ export default function SizeMasterPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Ages</SelectItem>
-                  {ageGroupOptions.map((opt) => (
+                  {ageGroupFilterOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -597,23 +696,20 @@ export default function SizeMasterPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="size_name">Size Name *</Label>
-                        <Select
+                        <SearchableSelect
+                          options={sizeNameOptions}
                           value={sizeFormData.size_name}
                           onValueChange={(v) =>
                             setSizeFormData({ ...sizeFormData, size_name: v })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select size" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {sizeNames.map((size) => (
-                              <SelectItem key={size} value={size}>
-                                {size}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Select or add size"
+                          searchPlaceholder="Search sizes..."
+                          emptyMessage="No sizes found"
+                          allowAddNew={true}
+                          onAddNew={handleAddSizeName}
+                          addNewLabel="Add Custom Size"
+                          addNewPlaceholder="Enter size name (e.g., 3XL, 38)"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="size_label">Display Label</Label>
@@ -631,63 +727,54 @@ export default function SizeMasterPage() {
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="gender">Gender *</Label>
-                        <Select
+                        <SearchableSelect
+                          options={genderOptions}
                           value={sizeFormData.gender}
-                          onValueChange={(v: GenderEnum) =>
-                            setSizeFormData({ ...sizeFormData, gender: v })
+                          onValueChange={(v) =>
+                            setSizeFormData({ ...sizeFormData, gender: v as GenderEnum })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {genderOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Select gender"
+                          searchPlaceholder="Search..."
+                          emptyMessage="No match found"
+                          allowAddNew={true}
+                          onAddNew={handleAddGender}
+                          addNewLabel="Add Custom Gender"
+                          addNewPlaceholder="Enter gender category"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="age_group">Age Group *</Label>
-                        <Select
+                        <SearchableSelect
+                          options={ageGroupOptions}
                           value={sizeFormData.age_group}
-                          onValueChange={(v: AgeGroupEnum) =>
-                            setSizeFormData({ ...sizeFormData, age_group: v })
+                          onValueChange={(v) =>
+                            setSizeFormData({ ...sizeFormData, age_group: v as AgeGroupEnum })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ageGroupOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Select age group"
+                          searchPlaceholder="Search..."
+                          emptyMessage="No match found"
+                          allowAddNew={true}
+                          onAddNew={handleAddAgeGroup}
+                          addNewLabel="Add Custom Age Group"
+                          addNewPlaceholder="Enter age group"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="fit_type">Fit Type</Label>
-                        <Select
+                        <SearchableSelect
+                          options={fitTypeOptions}
                           value={sizeFormData.fit_type}
-                          onValueChange={(v: FitTypeEnum) =>
-                            setSizeFormData({ ...sizeFormData, fit_type: v })
+                          onValueChange={(v) =>
+                            setSizeFormData({ ...sizeFormData, fit_type: v as FitTypeEnum })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {fitTypeOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Select fit"
+                          searchPlaceholder="Search..."
+                          emptyMessage="No match found"
+                          allowAddNew={true}
+                          onAddNew={handleAddFitType}
+                          addNewLabel="Add Custom Fit Type"
+                          addNewPlaceholder="Enter fit type"
+                        />
                       </div>
                     </div>
 

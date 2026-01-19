@@ -153,20 +153,31 @@ describe('Textile Units Verification', () => {
 
     // Mock useUnits hook
     vi.mocked(useUnits).mockReturnValue({
-      units: mockAllUnits,
-      categories: mockCategories,
+      data: mockAllUnits,
       isLoading: false,
-      error: null
+      error: null,
+      refetch: vi.fn()
     });
 
     // Mock useUnitSearch hook
     vi.mocked(useUnitSearch).mockReturnValue({
-      searchUnits: (query: string) => 
-        mockAllUnits.filter(unit => 
-          unit.name.toLowerCase().includes(query.toLowerCase()) ||
-          unit.symbol.toLowerCase().includes(query.toLowerCase()) ||
-          unit.category_name.toLowerCase().includes(query.toLowerCase())
-        ),
+      searchUnits: (query: string, categoryFilter?: string) => {
+        let filtered = mockAllUnits;
+        
+        if (categoryFilter) {
+          filtered = filtered.filter(unit => unit.category_name === categoryFilter);
+        }
+        
+        if (query.trim()) {
+          filtered = filtered.filter(unit => 
+            unit.name.toLowerCase().includes(query.toLowerCase()) ||
+            unit.symbol.toLowerCase().includes(query.toLowerCase()) ||
+            unit.category_name.toLowerCase().includes(query.toLowerCase())
+          );
+        }
+        
+        return filtered;
+      },
       searchUnitsByCategory: (category: string) =>
         mockAllUnits.filter(unit => unit.category_name === category),
       searchUnitsByType: (type: string) =>
@@ -179,9 +190,15 @@ describe('Textile Units Verification', () => {
         mockAllUnits.find(unit => unit.id === id),
       findUnitBySymbol: (symbol: string) =>
         mockAllUnits.find(unit => unit.symbol === symbol),
+      allUnits: mockAllUnits,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
       totalUnits: mockAllUnits.length,
       categories: mockCategories.map(cat => cat.name),
-      unitTypes: ['SI', 'Desi', 'Textile']
+      unitTypes: ['SI', 'Desi', 'Textile'],
+      hasError: false,
+      isEmpty: false
     });
   });
 
@@ -218,10 +235,10 @@ describe('Textile Units Verification', () => {
 
       // Wait for dropdown to open and check for Textile units
       await waitFor(() => {
-        expect(screen.getByText(/GSM/)).toBeInTheDocument();
-        expect(screen.getByText(/Denier/)).toBeInTheDocument();
-        expect(screen.getByText(/Tex/)).toBeInTheDocument();
-        expect(screen.getByText(/Momme/)).toBeInTheDocument();
+        expect(screen.getByText('GSM (g/m²)')).toBeInTheDocument();
+        expect(screen.getByText('Denier (den)')).toBeInTheDocument();
+        expect(screen.getByText('Tex (tex)')).toBeInTheDocument();
+        expect(screen.getByText('Momme (mm)')).toBeInTheDocument();
       });
     });
 

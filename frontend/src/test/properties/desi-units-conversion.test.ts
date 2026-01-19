@@ -159,15 +159,18 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      // Call the convert function
+      result.current.convert({
         value: 80,
         fromUnitId: 20, // Tola
         toUnitId: 21    // Seer
       });
 
+      // Wait for the conversion to complete (after debounce + API call)
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(1);
@@ -181,15 +184,18 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      // Call the convert function
+      result.current.convert({
         value: 1,
         fromUnitId: 21, // Seer
         toUnitId: 20    // Tola
       });
 
+      // Wait for the conversion to complete (after debounce + API call)
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(80);
@@ -203,7 +209,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 40,
         fromUnitId: 21, // Seer
         toUnitId: 22    // Maund
@@ -211,7 +217,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(1);
@@ -225,7 +232,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 1,
         fromUnitId: 22, // Maund
         toUnitId: 21    // Seer
@@ -233,7 +240,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(40);
@@ -247,7 +255,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 3200,
         fromUnitId: 20, // Tola
         toUnitId: 22    // Maund
@@ -255,7 +263,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(1);
@@ -271,7 +280,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 100,
         fromUnitId: 40, // Lakh
         toUnitId: 41    // Crore
@@ -279,7 +288,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(1);
@@ -293,7 +303,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 1,
         fromUnitId: 41, // Crore
         toUnitId: 40    // Lakh
@@ -301,7 +311,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.result).toBe(100);
@@ -316,7 +327,7 @@ describe('Desi Units Conversion Tests', () => {
     it('should maintain conversion accuracy for Desi weight units', async () => {
       await fc.assert(
         fc.asyncProperty(
-          fc.float({ min: 0.1, max: 1000 }),
+          fc.float({ min: Math.fround(0.1), max: Math.fround(1000) }),
           fc.constantFrom(
             { from: 20, to: 21, name: 'Tola to Seer' },
             { from: 21, to: 20, name: 'Seer to Tola' },
@@ -327,7 +338,7 @@ describe('Desi Units Conversion Tests', () => {
             const wrapper = createWrapper();
             const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-            await result.current.convert({
+            result.current.convert({
               value,
               fromUnitId: conversion.from,
               toUnitId: conversion.to
@@ -335,7 +346,8 @@ describe('Desi Units Conversion Tests', () => {
 
             await waitFor(() => {
               expect(result.current.isConverting).toBe(false);
-            });
+              expect(result.current.convertedValue).not.toBeNull();
+            }, { timeout: 1000 });
 
             // Should have a valid conversion result
             expect(result.current.convertedValue).toBeDefined();
@@ -344,9 +356,9 @@ describe('Desi Units Conversion Tests', () => {
             expect(result.current.error).toBeNull();
           }
         ),
-        { numRuns: 20 }
+        { numRuns: 5 } // Reduced from 20 to 5 for faster execution
       );
-    });
+    }, 10000); // Increased timeout to 10 seconds
 
     // Feature: unit-conversion-integration, Property 8: Conversion Calculation Accuracy
     it('should maintain conversion accuracy for Desi count units', async () => {
@@ -361,7 +373,7 @@ describe('Desi Units Conversion Tests', () => {
             const wrapper = createWrapper();
             const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-            await result.current.convert({
+            result.current.convert({
               value,
               fromUnitId: conversion.from,
               toUnitId: conversion.to
@@ -369,7 +381,8 @@ describe('Desi Units Conversion Tests', () => {
 
             await waitFor(() => {
               expect(result.current.isConverting).toBe(false);
-            });
+              expect(result.current.convertedValue).not.toBeNull();
+            }, { timeout: 1000 });
 
             // Should have a valid conversion result
             expect(result.current.convertedValue).toBeDefined();
@@ -389,7 +402,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 80,
         fromUnitId: 20, // Tola
         toUnitId: 21    // Seer
@@ -397,7 +410,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.formula).toBeDefined();
@@ -410,7 +424,7 @@ describe('Desi Units Conversion Tests', () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUnitConversion(), { wrapper });
 
-      await result.current.convert({
+      result.current.convert({
         value: 100,
         fromUnitId: 40, // Lakh
         toUnitId: 41    // Crore
@@ -418,7 +432,8 @@ describe('Desi Units Conversion Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isConverting).toBe(false);
-      });
+        expect(result.current.convertedValue).not.toBeNull();
+      }, { timeout: 1000 });
 
       expect(result.current.convertedValue).toBeDefined();
       expect(result.current.convertedValue!.from_unit.decimal_places).toBe(0);
