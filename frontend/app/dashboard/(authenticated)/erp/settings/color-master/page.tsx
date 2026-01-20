@@ -48,14 +48,12 @@ import {
   useUpdateUniversalColor,
   useDeleteUniversalColor,
   // H&M Colors
-  useHMColorGroups,
   useHMColors,
   useCreateHMColor,
   useUpdateHMColor,
   useDeleteHMColor,
   // Types
   type UniversalColor,
-  type HMColorGroup,
   type HMColor,
   type ColorFamilyEnum,
   type ColorTypeEnum,
@@ -126,19 +124,7 @@ const finishTypeOptions: { value: FinishTypeEnum; label: string }[] = [
   { value: "Stone Washed", label: "Stone Washed" },
 ];
 
-// H&M Color Group descriptions
-const hmGroupDescriptions: Record<string, string> = {
-  "01": "Achromatic (White, Black, Grey)",
-  "10": "Red spectrum",
-  "20": "Yellow spectrum",
-  "30": "Green spectrum",
-  "40": "Blue spectrum",
-  "50": "Violet/Purple spectrum",
-  "60": "Brown/Earth tones",
-  "70": "Pink spectrum",
-  "80": "Multi-color/Pattern",
-  "90": "Special/Metallic",
-};
+// H&M Color Master and Value options (dynamically generated from data)
 
 export default function ColorMasterPage() {
   const { user } = useAuth();
@@ -153,7 +139,8 @@ export default function ColorMasterPage() {
 
   // H&M Colors State
   const [hmSearchTerm, setHMSearchTerm] = useState("");
-  const [hmGroupFilter, setHMGroupFilter] = useState<string>("all");
+  const [hmColorMasterFilter, setHMColorMasterFilter] = useState<string>("all");
+  const [hmColorValueFilter, setHMColorValueFilter] = useState<string>("all");
   const [isHMDialogOpen, setIsHMDialogOpen] = useState(false);
   const [editingHM, setEditingHM] = useState<HMColor | null>(null);
 
@@ -173,11 +160,10 @@ export default function ColorMasterPage() {
 
   // H&M Color Form
   const [hmFormData, setHMFormData] = useState({
-    hm_code: "",
-    hm_name: "",
-    group_id: 0,
-    universal_color_id: 0,
-    description: "",
+    color_code: "",
+    color_master: "",
+    color_value: "",
+    mixed_name: "",
     is_active: true,
   });
 
@@ -187,13 +173,10 @@ export default function ColorMasterPage() {
     universalTypeFilter !== "all" ? universalTypeFilter : undefined
   );
 
-  const { data: hmGroups = [], isLoading: groupsLoading } = useHMColorGroups();
-
   const { data: hmColors = [], isLoading: hmLoading } = useHMColors(
-    hmGroupFilter !== "all" ? parseInt(hmGroupFilter) : undefined
+    hmColorMasterFilter !== "all" ? hmColorMasterFilter : undefined,
+    hmColorValueFilter !== "all" ? hmColorValueFilter : undefined
   );
-
-  const { data: universalForSelector = [] } = useUniversalColorsForSelector();
 
   // Mutations
   const createUniversalMutation = useCreateUniversalColor();
@@ -228,8 +211,10 @@ export default function ColorMasterPage() {
       const term = hmSearchTerm.toLowerCase();
       filtered = filtered.filter(
         (c) =>
-          c.hm_code.toLowerCase().includes(term) ||
-          c.hm_name.toLowerCase().includes(term)
+          c.color_code.toLowerCase().includes(term) ||
+          c.color_master.toLowerCase().includes(term) ||
+          (c.color_value?.toLowerCase().includes(term)) ||
+          (c.mixed_name?.toLowerCase().includes(term))
       );
     }
     return filtered;
@@ -324,8 +309,6 @@ export default function ColorMasterPage() {
     try {
       const data = {
         ...hmFormData,
-        group_id: hmFormData.group_id || undefined,
-        universal_color_id: hmFormData.universal_color_id || undefined,
       };
 
       if (editingHM) {
@@ -345,11 +328,10 @@ export default function ColorMasterPage() {
   const handleEditHM = (color: HMColor) => {
     setEditingHM(color);
     setHMFormData({
-      hm_code: color.hm_code,
-      hm_name: color.hm_name,
-      group_id: color.group_id,
-      universal_color_id: color.universal_color_id || 0,
-      description: color.description || "",
+      color_code: color.color_code,
+      color_master: color.color_master,
+      color_value: color.color_value || "",
+      mixed_name: color.mixed_name || "",
       is_active: color.is_active,
     });
     setIsHMDialogOpen(true);
@@ -369,11 +351,10 @@ export default function ColorMasterPage() {
   const resetHMForm = () => {
     setEditingHM(null);
     setHMFormData({
-      hm_code: "",
-      hm_name: "",
-      group_id: 0,
-      universal_color_id: 0,
-      description: "",
+      color_code: "",
+      color_master: "",
+      color_value: "",
+      mixed_name: "",
       is_active: true,
     });
   };
@@ -477,18 +458,30 @@ export default function ColorMasterPage() {
                   <Building2 className="h-5 w-5" />
                   H&M Colors
                 </CardTitle>
-                <CardDescription>H&M proprietary 5-digit codes (XX-XXX)</CardDescription>
+                <CardDescription>H&M proprietary color codes with master/value structure</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">{(hmColors as HMColor[]).length}</div>
-                <p className="text-sm text-muted-foreground">Total H&M color codes</p>
+                <p className="text-sm text-muted-foreground">Total H&M color codes imported from Excel</p>
                 <div className="mt-4 space-y-2">
-                  {(hmGroups as HMColorGroup[]).slice(0, 4).map((group) => (
-                    <div key={group.id} className="flex justify-between text-sm">
-                      <span>{group.group_code} - {group.group_name}</span>
-                      <Badge variant="secondary">{group.colors?.length || 0}</Badge>
-                    </div>
-                  ))}
+                  {/* Show top color masters */}
+                  {(() => {
+                    const colorMasters = (hmColors as HMColor[]).reduce((acc, color) => {
+                      const master = color.color_master;
+                      acc[master] = (acc[master] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>);
+                    
+                    return Object.entries(colorMasters)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 4)
+                      .map(([master, count]) => (
+                        <div key={master} className="flex justify-between text-sm">
+                          <span>{master}</span>
+                          <Badge variant="secondary">{count}</Badge>
+                        </div>
+                      ));
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -537,7 +530,7 @@ export default function ColorMasterPage() {
                     H&M Codes
                   </h4>
                   <p className="text-muted-foreground">
-                    H&M proprietary 5-digit codes (XX-XXX format)
+                    H&M proprietary color codes with master/value structure
                   </p>
                 </div>
               </div>
@@ -912,7 +905,7 @@ export default function ColorMasterPage() {
             <CardContent className="py-3">
               <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
                 <Info className="h-4 w-4" />
-                H&M uses proprietary 5-digit color codes (XX-XXX format). First 2 digits indicate the color group.
+                H&M colors imported from Excel with Color Code, Color Master, Color Value, and Mixed Name fields.
               </p>
             </CardContent>
           </Card>
@@ -922,23 +915,42 @@ export default function ColorMasterPage() {
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search H&M code or name..."
+                  placeholder="Search code, master, value..."
                   value={hmSearchTerm}
                   onChange={(e) => setHMSearchTerm(e.target.value)}
                   className="pl-8 w-[250px]"
                 />
               </div>
-              <Select value={hmGroupFilter} onValueChange={setHMGroupFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Color Group" />
+              <Select value={hmColorMasterFilter} onValueChange={setHMColorMasterFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Colour Master" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {(hmGroups as HMColorGroup[]).map((group) => (
-                    <SelectItem key={group.id} value={String(group.id)}>
-                      {group.group_code} - {group.group_name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All Masters</SelectItem>
+                  {(() => {
+                    const masters = [...new Set((hmColors as HMColor[]).map(c => c.color_master))].sort();
+                    return masters.map((master) => (
+                      <SelectItem key={master} value={master}>
+                        {master}
+                      </SelectItem>
+                    ));
+                  })()}
+                </SelectContent>
+              </Select>
+              <Select value={hmColorValueFilter} onValueChange={setHMColorValueFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Colour Value" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Values</SelectItem>
+                  {(() => {
+                    const values = [...new Set((hmColors as HMColor[]).map(c => c.color_value).filter(Boolean))].sort();
+                    return values.map((value) => (
+                      <SelectItem key={value} value={value!}>
+                        {value}
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </div>
@@ -962,98 +974,58 @@ export default function ColorMasterPage() {
                     {editingHM ? "Edit H&M Color" : "Add H&M Color"}
                   </DialogTitle>
                   <DialogDescription>
-                    Add an H&M proprietary color code (XX-XXX format)
+                    Add an H&M color with code, master, value, and mixed name
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleHMSubmit}>
                   <div className="grid gap-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="hm_code">H&M Code *</Label>
+                      <Label htmlFor="color_code">Colour Code *</Label>
                       <Input
-                        id="hm_code"
-                        value={hmFormData.hm_code}
+                        id="color_code"
+                        value={hmFormData.color_code}
                         onChange={(e) =>
-                          setHMFormData({ ...hmFormData, hm_code: e.target.value })
+                          setHMFormData({ ...hmFormData, color_code: e.target.value })
                         }
                         placeholder="e.g., 51-138"
-                        pattern="\d{2}-\d{3}"
                         required
                       />
-                      <p className="text-xs text-muted-foreground">Format: XX-XXX (e.g., 51-138)</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="hm_name">H&M Name *</Label>
+                      <Label htmlFor="color_master">Colour Master *</Label>
                       <Input
-                        id="hm_name"
-                        value={hmFormData.hm_name}
+                        id="color_master"
+                        value={hmFormData.color_master}
                         onChange={(e) =>
-                          setHMFormData({ ...hmFormData, hm_name: e.target.value })
+                          setHMFormData({ ...hmFormData, color_master: e.target.value })
                         }
-                        placeholder="e.g., Dusty Pink"
+                        placeholder="e.g., BEIGE"
                         required
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="group_id">Color Group *</Label>
-                      <Select
-                        value={String(hmFormData.group_id || "")}
-                        onValueChange={(v) =>
-                          setHMFormData({ ...hmFormData, group_id: parseInt(v) })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select group" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(hmGroups as HMColorGroup[]).map((group) => (
-                            <SelectItem key={group.id} value={String(group.id)}>
-                              {group.group_code} - {group.group_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="universal_color_id">Link to Universal Color</Label>
-                      <Select
-                        value={String(hmFormData.universal_color_id || "")}
-                        onValueChange={(v) =>
-                          setHMFormData({ ...hmFormData, universal_color_id: parseInt(v) || 0 })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select universal color (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">None</SelectItem>
-                          {(universalForSelector as any[]).map((color: any) => (
-                            <SelectItem key={color.id} value={String(color.id)}>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full border"
-                                  style={{ backgroundColor: color.hex_code }}
-                                />
-                                {color.color_name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={hmFormData.description}
+                      <Label htmlFor="color_value">Colour Value</Label>
+                      <Input
+                        id="color_value"
+                        value={hmFormData.color_value}
                         onChange={(e) =>
-                          setHMFormData({ ...hmFormData, description: e.target.value })
+                          setHMFormData({ ...hmFormData, color_value: e.target.value })
                         }
-                        placeholder="Additional notes"
-                        rows={2}
+                        placeholder="e.g., MEDIUM DUSTY"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mixed_name">Mixed Name</Label>
+                      <Input
+                        id="mixed_name"
+                        value={hmFormData.mixed_name}
+                        onChange={(e) =>
+                          setHMFormData({ ...hmFormData, mixed_name: e.target.value })
+                        }
+                        placeholder="e.g., BEIGE MEDIUM DUSTY"
                       />
                     </div>
 
@@ -1086,26 +1058,25 @@ export default function ColorMasterPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">Color</TableHead>
-                  <TableHead>H&M Code</TableHead>
-                  <TableHead>H&M Name</TableHead>
-                  <TableHead>Group</TableHead>
-                  <TableHead>Linked Universal</TableHead>
+                  <TableHead>Colour Code</TableHead>
+                  <TableHead>Colour Master</TableHead>
+                  <TableHead>Colour Value</TableHead>
+                  <TableHead>Mixed Name</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {hmLoading || groupsLoading ? (
+                {hmLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredHMColors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
-                      {hmSearchTerm || hmGroupFilter !== "all"
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      {hmSearchTerm || hmColorMasterFilter !== "all" || hmColorValueFilter !== "all"
                         ? "No H&M colors found matching your filters."
                         : "No H&M colors yet. Add your first H&M color."}
                     </TableCell>
@@ -1114,43 +1085,18 @@ export default function ColorMasterPage() {
                   filteredHMColors.map((color) => (
                     <TableRow key={color.id}>
                       <TableCell>
-                        {color.universal_color ? (
-                          <div
-                            className="w-8 h-8 rounded-md border shadow-sm"
-                            style={{ backgroundColor: color.universal_color.hex_code }}
-                            title={color.universal_color.hex_code}
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-md border shadow-sm bg-gray-200 flex items-center justify-center text-xs text-gray-500">
-                            ?
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <code className="px-2 py-1 bg-muted rounded text-sm font-mono font-bold">
-                          {color.hm_code}
+                          {color.color_code}
                         </code>
                       </TableCell>
-                      <TableCell className="font-medium">{color.hm_name}</TableCell>
+                      <TableCell className="font-medium">{color.color_master}</TableCell>
                       <TableCell>
-                        {color.group && (
-                          <Badge variant="outline">
-                            {color.group.group_code} - {color.group.group_name}
-                          </Badge>
+                        {color.color_value && (
+                          <Badge variant="outline">{color.color_value}</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {color.universal_color ? (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded-full border"
-                              style={{ backgroundColor: color.universal_color.hex_code }}
-                            />
-                            <span className="text-sm">{color.universal_color.color_name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">Not linked</span>
-                        )}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {color.mixed_name}
                       </TableCell>
                       <TableCell>
                         <Badge variant={color.is_active ? "default" : "secondary"}>
@@ -1174,22 +1120,63 @@ export default function ColorMasterPage() {
             </Table>
           </div>
 
-          {/* H&M Color Groups Reference */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">H&M Color Group Reference</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
-                {Object.entries(hmGroupDescriptions).map(([code, desc]) => (
-                  <div key={code} className="p-2 bg-muted rounded">
-                    <span className="font-mono font-bold">{code}</span>
-                    <span className="text-muted-foreground ml-2">{desc}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* H&M Color Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Top Color Masters</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {(() => {
+                    const colorMasters = (hmColors as HMColor[]).reduce((acc, color) => {
+                      const master = color.color_master;
+                      acc[master] = (acc[master] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>);
+                    
+                    return Object.entries(colorMasters)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 8)
+                      .map(([master, count]) => (
+                        <div key={master} className="flex justify-between text-sm">
+                          <span className="font-medium">{master}</span>
+                          <Badge variant="secondary">{count}</Badge>
+                        </div>
+                      ));
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Top Color Values</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {(() => {
+                    const colorValues = (hmColors as HMColor[]).reduce((acc, color) => {
+                      if (color.color_value) {
+                        acc[color.color_value] = (acc[color.color_value] || 0) + 1;
+                      }
+                      return acc;
+                    }, {} as Record<string, number>);
+                    
+                    return Object.entries(colorValues)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 8)
+                      .map(([value, count]) => (
+                        <div key={value} className="flex justify-between text-sm">
+                          <span className="font-medium">{value}</span>
+                          <Badge variant="secondary">{count}</Badge>
+                        </div>
+                      ));
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

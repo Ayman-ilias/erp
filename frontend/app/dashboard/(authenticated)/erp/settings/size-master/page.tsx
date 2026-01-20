@@ -63,6 +63,7 @@ import {
   type FitTypeEnum,
   type AgeGroupEnum,
 } from "@/hooks/use-sizecolor";
+import { MeasurementSpecInput, type MeasurementSpec } from "@/components/size-master/measurement-spec-input";
 
 // Gender options with colors for badges
 const genderOptionsWithColors: { value: GenderEnum; label: string; color: string }[] = [
@@ -196,6 +197,9 @@ export default function SizeMasterPage() {
     is_active: true,
   });
 
+  // Measurement specifications state
+  const [measurementSpecs, setMeasurementSpecs] = useState<MeasurementSpec[]>([]);
+
   // Garment type form
   const [garmentTypeFormData, setGarmentTypeFormData] = useState({
     name: "",
@@ -228,7 +232,7 @@ export default function SizeMasterPage() {
   const sizes = sizesData as SizeMaster[];
 
   // Get measurement specs for selected garment type
-  const { data: measurementSpecs = [] } = useGarmentTypeMeasurements(selectedGarmentTypeId || 0);
+  const { data: garmentMeasurementSpecs = [] } = useGarmentTypeMeasurements(selectedGarmentTypeId || 0);
 
   // Mutations
   const createGarmentTypeMutation = useCreateGarmentType();
@@ -278,20 +282,63 @@ export default function SizeMasterPage() {
     setExpandedRows(newExpanded);
   };
 
-  // Size handlers
+// Size handlers
   const handleSizeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const data = {
-        ...sizeFormData,
-        garment_type_id: sizeFormData.garment_type_id || undefined,
+      // Prepare measurement data for creation (without server-generated fields)
+      const measurements = measurementSpecs
+        .filter(spec => spec.measurement_name && spec.value)
+        .map(spec => ({
+          measurement_name: spec.measurement_name,
+          measurement_code: spec.measurement_code || spec.measurement_name.toUpperCase().replace(/\s+/g, '_'),
+          value_cm: parseFloat(spec.value),
+          unit_symbol: spec.unit_symbol,
+          unit_name: spec.unit_name,
+          tolerance_plus: spec.tolerance_plus || 1.0,
+          tolerance_minus: spec.tolerance_minus || 1.0,
+          notes: spec.notes || "",
+          display_order: spec.display_order || 0,
+          is_custom: spec.is_custom || false,
+          measurement_spec_id: spec.measurement_spec_id,
+          original_value: spec.original_value || parseFloat(spec.value),
+          original_unit: spec.original_unit || spec.unit_symbol,
+        }));
+
+      // Define proper types for create and update operations
+      type CreateSizeData = Omit<Partial<SizeMaster>, 'measurements'> & {
+        measurements?: Array<{
+          measurement_name: string;
+          measurement_code: string;
+          value_cm: number;
+          unit_symbol: string;
+          unit_name: string;
+          tolerance_plus: number;
+          tolerance_minus: number;
+          notes: string;
+          display_order: number;
+          is_custom: boolean;
+          measurement_spec_id?: number;
+          original_value: number;
+          original_unit: string;
+        }>;
       };
 
       if (editingSize) {
-        await updateSizeMutation.mutateAsync({ id: editingSize.id, data });
+        // For updates, we don't send measurements in the main payload
+        const updateData: Partial<SizeMaster> = {
+          ...sizeFormData,
+          garment_type_id: sizeFormData.garment_type_id || undefined,
+        };
+        await updateSizeMutation.mutateAsync({ id: editingSize.id, data: updateData });
         toast.success("Size updated successfully");
       } else {
-        await createSizeMutation.mutateAsync(data);
+        const createData: CreateSizeData = {
+          ...sizeFormData,
+          garment_type_id: sizeFormData.garment_type_id || undefined,
+          measurements: measurements,
+        };
+        await createSizeMutation.mutateAsync(createData as Partial<SizeMaster>);
         toast.success("Size created successfully");
       }
       setIsSizeDialogOpen(false);
@@ -314,6 +361,26 @@ export default function SizeMasterPage() {
       description: item.description || "",
       is_active: item.is_active,
     });
+
+    // Convert existing measurements to MeasurementSpec format
+    const existingMeasurements: MeasurementSpec[] = (item.measurements || []).map(m => ({
+      id: m.id,
+      measurement_name: m.measurement_name,
+      measurement_code: m.measurement_code,
+      value: m.value_cm?.toString() || "",
+      unit_symbol: m.unit_symbol || "cm",
+      unit_name: m.unit_name || "Centimeter",
+      tolerance_plus: m.tolerance_plus,
+      tolerance_minus: m.tolerance_minus,
+      notes: m.notes || "",
+      display_order: m.display_order || 0,
+      is_custom: m.is_custom || false,
+      measurement_spec_id: m.measurement_spec_id,
+      original_value: m.original_value,
+      original_unit: m.original_unit,
+    }));
+    setMeasurementSpecs(existingMeasurements);
+
     setIsSizeDialogOpen(true);
   };
 
@@ -342,6 +409,7 @@ export default function SizeMasterPage() {
       is_active: true,
     });
     setSelectedGarmentTypeId(null);
+    setMeasurementSpecs([]);
   };
 
   // Handlers for adding new custom options
@@ -680,17 +748,13 @@ export default function SizeMasterPage() {
                       </Select>
                     </div>
 
-                    {sizeFormData.garment_type_id > 0 && (measurementSpecs as GarmentMeasurementSpec[]).length > 0 && (
-                      <div className="p-3 bg-muted rounded">
-                        <h4 className="text-sm font-medium mb-2">Measurements for this garment:</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {(measurementSpecs as GarmentMeasurementSpec[]).map((spec) => (
-                            <Badge key={spec.id} variant="outline" className="text-xs">
-                              {spec.measurement_name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+                    {sizeFormData.garment_type_id > 0 && (
+                      <MeasurementSpecInput
+                        measurements={measurementSpecs}
+                        onMeasurementsChange={setMeasurementSpecs}
+                        predefinedMeasurements={(garmentMeasurementSpecs as GarmentMeasurementSpec[]).map(spec => spec.measurement_name)}
+                        disabled={createSizeMutation.isPending || updateSizeMutation.isPending}
+                      />
                     )}
 
                     <div className="grid grid-cols-2 gap-4">
@@ -1116,7 +1180,7 @@ export default function SizeMasterPage() {
                     <SelectValue placeholder="Select measurement" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(measurementSpecs as GarmentMeasurementSpec[]).map((spec) => (
+                    {(garmentMeasurementSpecs as GarmentMeasurementSpec[]).map((spec) => (
                       <SelectItem key={spec.id} value={String(spec.id)}>
                         {spec.measurement_name} ({spec.measurement_code})
                       </SelectItem>

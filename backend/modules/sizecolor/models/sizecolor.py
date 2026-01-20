@@ -199,81 +199,34 @@ class UniversalColor(BaseSizeColor):
 
 
 # =============================================================================
-# TABLE 2: H&M COLOR (Separate table for H&M codes)
+# TABLE 2: H&M COLOR (Simplified structure based on Excel data)
 # =============================================================================
-
-class HMColorGroup(BaseSizeColor):
-    """
-    H&M Color Groups (first 2 digits of H&M code)
-    H&M uses 8 color groups in their color wheel:
-    - 01-09: Achromatic (White, Grey, Black)
-    - 10-19: Red
-    - 20-29: Yellow
-    - 30-39: Green
-    - 40-49: Blue
-    - 50-59: Violet/Purple
-    - 60-69: Brown/Earth
-    - 70-79: Pink
-    """
-    __tablename__ = "hm_color_groups"
-
-    id = Column(Integer, primary_key=True, index=True)
-    group_code = Column(String(2), unique=True, nullable=False)  # 01, 09, 20, etc.
-    group_name = Column(String(50), nullable=False)  # White, Black, Yellow, etc.
-    group_range_start = Column(Integer)  # 01
-    group_range_end = Column(Integer)  # 09
-    description = Column(Text)
-    hex_sample = Column(String(7))  # Sample hex for this group
-    is_active = Column(Boolean, default=True)
-    display_order = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    colors = relationship("HMColor", back_populates="color_group", cascade="all, delete-orphan")
-
 
 class HMColor(BaseSizeColor):
     """
-    H&M Proprietary Color Codes
-    Format: XX-XXX (5 digits, e.g., 09-090 for Black, 01-100 for White)
-    First 2 digits = color group, Last 3 digits = specific shade/variation
+    H&M Color Master - Simplified structure based on Excel import
+    Fields: Color Code, Color Master, Color Value, MIXED NAME
     """
     __tablename__ = "hm_colors"
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # H&M specific code
-    hm_code = Column(String(10), unique=True, nullable=False, index=True)  # e.g., "09-090"
-    hm_name = Column(String(100), nullable=False)  # H&M's name for this color
+    # Core fields from Excel
+    color_code = Column(String(20), unique=True, nullable=False, index=True)  # e.g., "51-138"
+    color_master = Column(String(100), nullable=False, index=True)  # e.g., "BEIGE"
+    color_value = Column(String(100), nullable=True, index=True)  # e.g., "MEDIUM DUSTY"
+    mixed_name = Column(String(200), nullable=True, index=True)  # e.g., "BEIGE MEDIUM DUSTY"
 
-    # Link to color group
-    group_id = Column(Integer, ForeignKey("hm_color_groups.id"), index=True)
-
-    # Optional mapping to universal color (for cross-reference)
-    universal_color_id = Column(Integer, ForeignKey("universal_colors.id"), nullable=True)
-
-    # Approximate visual representation
-    hex_code = Column(String(7))  # Approximate hex for display
-    rgb_r = Column(Integer)
-    rgb_g = Column(Integer)
-    rgb_b = Column(Integer)
-
-    # Additional Info
-    description = Column(Text)
-    notes = Column(Text)  # Special notes for this color
-
-    # Status
+    # Status and metadata
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
-    color_group = relationship("HMColorGroup", back_populates="colors")
-    universal_color = relationship("UniversalColor")
-
     __table_args__ = (
-        Index('ix_hm_color_code', 'hm_code'),
-        Index('ix_hm_color_group', 'group_id'),
+        Index('ix_hm_color_code', 'color_code'),
+        Index('ix_hm_color_master', 'color_master'),
+        Index('ix_hm_color_value', 'color_value'),
+        Index('ix_hm_mixed_name', 'mixed_name'),
     )
 
 
@@ -383,8 +336,9 @@ class SizeMaster(BaseSizeColor):
 
 class SizeMeasurement(BaseSizeColor):
     """
-    Actual measurements for each size
-    Values like Chest: 96cm ±2.0
+    Actual measurements for each size with enhanced unit support
+    Values like Chest: 96cm ±2.0 with unit conversion integration
+    Supports both predefined measurements (from garment specs) and custom measurements
     """
     __tablename__ = "size_measurements"
 
@@ -394,10 +348,27 @@ class SizeMeasurement(BaseSizeColor):
     measurement_code = Column(String(20), nullable=False)  # CHEST, WAIST, etc.
     measurement_name = Column(String(50), nullable=False)
 
+    # Values (cm is always the base unit for storage)
     value_cm = Column(Numeric(10, 2), nullable=False)
     value_inch = Column(Numeric(10, 2))  # Auto-calculated
+
+    # Unit information for display and conversion
+    unit_symbol = Column(String(10), nullable=False, default="cm")  # cm, inch, mm, etc.
+    unit_name = Column(String(50), nullable=False, default="Centimeter")  # Display name
+
+    # Tolerance values
     tolerance_plus = Column(Numeric(5, 2), default=2.0)
     tolerance_minus = Column(Numeric(5, 2), default=2.0)
+
+    # Optional reference to predefined measurement spec
+    measurement_spec_id = Column(Integer, ForeignKey("garment_measurement_specs.id", ondelete="SET NULL"), nullable=True)
+
+    # Track if this is a custom measurement (not from garment type specs)
+    is_custom = Column(Boolean, default=False)
+
+    # Track original input for conversion history
+    original_value = Column(Numeric(10, 2))  # Original value entered by user
+    original_unit = Column(String(10))  # Original unit entered by user
 
     notes = Column(Text)
     display_order = Column(Integer, default=0)
@@ -406,10 +377,16 @@ class SizeMeasurement(BaseSizeColor):
 
     # Relationships
     size_master = relationship("SizeMaster", back_populates="measurements")
+    measurement_spec = relationship("GarmentMeasurementSpec")
 
     __table_args__ = (
-        UniqueConstraint('size_master_id', 'measurement_code', name='uq_size_measurement'),
+        # Allow multiple custom measurements with same code, but only one predefined per code
+        # Note: Partial unique constraint not supported in this SQLAlchemy version, handled at application level
         Index('ix_size_measurement', 'size_master_id', 'measurement_code'),
+        Index('ix_size_measurements_unit_symbol', 'unit_symbol'),
+        Index('ix_size_measurements_is_custom', 'is_custom'),
+        Index('ix_size_measurements_spec_id', 'measurement_spec_id'),
+        Index('ix_size_measurements_size_measurement', 'size_master_id', 'measurement_code', 'is_custom'),
     )
 
 

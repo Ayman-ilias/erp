@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from core.database import SessionLocalSizeColor
 from modules.sizecolor.models.sizecolor import (
     # New models
-    UniversalColor, HMColorGroup, HMColor,
+    UniversalColor, HMColor,
     GarmentType, GarmentMeasurementSpec,
     SizeMaster, SizeMeasurement,
     # Enums
@@ -30,7 +30,6 @@ def seed_sizecolor_data():
         # Check if data already exists
         existing_garment_types = db.query(GarmentType).count()
         existing_colors = db.query(UniversalColor).count()
-        existing_hm_groups = db.query(HMColorGroup).count()
 
         if existing_garment_types > 0 and existing_colors > 0:
             logger.info("Size & Color data already seeded, skipping...")
@@ -305,45 +304,8 @@ def seed_sizecolor_data():
         logger.info(f"Garment types seeded: {len(garment_type_map)} types")
 
         # =================================================================
-        # STEP 2: H&M COLOR GROUPS
-        # =================================================================
-        hm_groups_data = [
-            ("01", "White", 1, 9, "#FFFFFF", 1),
-            ("07", "Grey", 7, 9, "#808080", 2),
-            ("09", "Black", 9, 9, "#000000", 3),
-            ("10", "Red", 10, 19, "#FF0000", 4),
-            ("20", "Yellow", 20, 29, "#FFFF00", 5),
-            ("30", "Green", 30, 39, "#008000", 6),
-            ("40", "Blue", 40, 49, "#0000FF", 7),
-            ("50", "Violet/Purple", 50, 59, "#800080", 8),
-            ("60", "Brown/Earth", 60, 69, "#8B4513", 9),
-            ("70", "Pink", 70, 79, "#FFC0CB", 10),
-        ]
-
-        hm_group_map = {}
-        for g_code, g_name, g_start, g_end, g_hex, g_order in hm_groups_data:
-            existing = db.query(HMColorGroup).filter(HMColorGroup.group_code == g_code).first()
-            if existing:
-                hm_group_map[g_code] = existing
-                continue
-
-            group = HMColorGroup(
-                group_code=g_code,
-                group_name=g_name,
-                group_range_start=g_start,
-                group_range_end=g_end,
-                hex_sample=g_hex,
-                display_order=g_order,
-            )
-            db.add(group)
-            db.flush()
-            hm_group_map[g_code] = group
-
-        db.commit()
-        logger.info(f"H&M color groups seeded: {len(hm_group_map)} groups")
-
-        # =================================================================
-        # STEP 3: UNIVERSAL COLORS (Pantone/TCX/RGB/Hex)
+        # STEP 2: UNIVERSAL COLORS (Pantone/TCX/RGB/Hex)
+        # Note: H&M colors are now imported from Excel file separately
         # =================================================================
         universal_colors_data = [
             # Blacks & Greys

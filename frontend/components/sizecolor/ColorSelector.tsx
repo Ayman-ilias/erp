@@ -59,7 +59,6 @@ import { cn } from "@/lib/utils";
 import {
   useUniversalColorsForSelector,
   useHMColorsForSelector,
-  useHMColorGroups,
   useUniversalColorByCode,
   useHMColorByCode,
   type UniversalColorForSelector,
@@ -127,7 +126,6 @@ export function ColorSelector({
 
   // Search state for H&M Colors
   const [hmSearchCode, setHmSearchCode] = useState("");
-  const [hmGroupFilter, setHmGroupFilter] = useState<number | undefined>();
 
   // Quick search popover
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
@@ -136,8 +134,7 @@ export function ColorSelector({
   const { data: universalColors, isLoading: universalLoading, error: universalError } = useUniversalColorsForSelector(
     universalColorFamily || undefined
   );
-  const { data: hmColors, isLoading: hmLoading, error: hmError } = useHMColorsForSelector(hmGroupFilter);
-  const { data: hmColorGroups, error: hmGroupsError } = useHMColorGroups();
+  const { data: hmColors, isLoading: hmLoading, error: hmError } = useHMColorsForSelector();
 
   // Code lookup hooks
   const { data: universalColorByCode, isLoading: universalCodeLoading } = useUniversalColorByCode(
@@ -151,8 +148,7 @@ export function ColorSelector({
   React.useEffect(() => {
     if (universalError) console.error("Universal colors error:", universalError);
     if (hmError) console.error("HM colors error:", hmError);
-    if (hmGroupsError) console.error("HM groups error:", hmGroupsError);
-  }, [universalError, hmError, hmGroupsError]);
+  }, [universalError, hmError]);
 
   // ============================================================================
   // FILTERING LOGIC
@@ -194,8 +190,9 @@ export function ColorSelector({
 
     const searchLower = hmSearchCode.toLowerCase();
     return hmColors.filter((color: HMColorForSelector) =>
-      color.hm_code.toLowerCase().includes(searchLower) ||
-      color.hm_name.toLowerCase().includes(searchLower)
+      color.color_code.toLowerCase().includes(searchLower) ||
+      color.color_master.toLowerCase().includes(searchLower) ||
+      (color.mixed_name && color.mixed_name.toLowerCase().includes(searchLower))
     );
   }, [hmColors, hmSearchCode]);
 
@@ -244,10 +241,10 @@ export function ColorSelector({
       const newColor: SelectedColor = {
         id: color.id,
         type: "hm",
-        code: color.hm_code,
-        name: color.hm_name,
-        hex_code: color.hex_code || "#CCCCCC",
-        display_name: `${color.hm_name} (${color.hm_code})`,
+        code: color.color_code,
+        name: color.color_master,
+        hex_code: "#CCCCCC", // Default color for H&M colors since they don't have hex codes
+        display_name: `${color.color_master} (${color.color_code})`,
       };
       onColorsChange([...selectedColors, newColor]);
     }
@@ -516,38 +513,18 @@ export function ColorSelector({
                     )}
                   </div>
                 </div>
-
-                <div className="w-48">
-                  <Label className="text-xs text-muted-foreground">Color Group</Label>
-                  <Select
-                    value={hmGroupFilter?.toString() || ""}
-                    onValueChange={(v) => setHmGroupFilter(v ? parseInt(v) : undefined)}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="All Groups" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Groups</SelectItem>
-                      {hmColorGroups?.map((group: any) => (
-                        <SelectItem key={group.id} value={group.id.toString()}>
-                          {group.group_code}: {group.group_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               {/* H&M Code Lookup Result */}
               {hmColorByCode && hmSearchCode.length >= 5 && (
                 <div className="p-3 border rounded-md bg-green-50 dark:bg-green-900/20">
                   <div className="flex items-center gap-3">
-                    {renderColorSwatch(hmColorByCode.hex_code || "#CCCCCC", "lg")}
+                    {renderColorSwatch("#CCCCCC", "lg")}
                     <div className="flex-1">
-                      <div className="font-medium">{hmColorByCode.hm_name}</div>
+                      <div className="font-medium">{hmColorByCode.color_master}</div>
                       <div className="text-sm text-muted-foreground">
-                        H&M Code: {hmColorByCode.hm_code}
-                        {hmColorByCode.group_name && <span className="ml-3">Group: {hmColorByCode.group_name}</span>}
+                        H&M Code: {hmColorByCode.color_code}
+                        {hmColorByCode.mixed_name && <span className="ml-3">Mixed: {hmColorByCode.mixed_name}</span>}
                       </div>
                     </div>
                     <Button
@@ -611,11 +588,11 @@ export function ColorSelector({
                               : "border-transparent hover:border-gray-300 hover:bg-muted/50"
                           )}
                         >
-                          {renderColorSwatch(color.hex_code || "#CCCCCC", "md")}
+                          {renderColorSwatch("#CCCCCC", "md")}
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{color.hm_name}</div>
+                            <div className="text-sm font-medium truncate">{color.color_master}</div>
                             <div className="text-xs text-muted-foreground font-mono">
-                              {color.hm_code}
+                              {color.color_code}
                             </div>
                           </div>
                           {isSelected && (

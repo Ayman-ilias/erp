@@ -2,7 +2,7 @@
 Merchandiser Department Schemas
 Pydantic models for request/response validation
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -376,6 +376,30 @@ class SamplePrimaryInfoResponse(SamplePrimaryInfoBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    @field_validator('decorative_part', mode='before')
+    @classmethod
+    def normalize_decorative_part(cls, v):
+        """Convert decorative_part to list if it's a string"""
+        if v is None or v == '':
+            return None
+        if isinstance(v, str):
+            items = [item.strip() for item in v.split(',') if item.strip()]
+            return items if items else None
+        return v
+    
+    @field_validator('additional_instruction', mode='before')
+    @classmethod
+    def normalize_additional_instruction(cls, v):
+        """Convert additional_instruction to list if it's a string"""
+        if v is None or v == '':
+            return None
+        if isinstance(v, str):
+            # For merchandiser, additional_instruction should be a list of dicts
+            # If it's a string, convert to list of instruction objects
+            lines = [line.strip() for line in v.split('\n') if line.strip()]
+            return [{"instruction": line, "done": False} for line in lines] if lines else None
+        return v
 
     class Config:
         from_attributes = True

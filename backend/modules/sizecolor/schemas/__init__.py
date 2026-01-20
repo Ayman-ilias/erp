@@ -6,7 +6,6 @@ from .sizecolor import (
     UniversalColorCreate, UniversalColorUpdate, UniversalColorResponse,
     UniversalColorListResponse, UniversalColorForSelector,
     # H&M Color Schemas
-    HMColorGroupCreate, HMColorGroupResponse,
     HMColorCreate, HMColorUpdate, HMColorResponse, HMColorListResponse, HMColorForSelector,
     # Garment Type Schemas
     GarmentTypeCreate, GarmentTypeUpdate, GarmentTypeResponse,
@@ -33,7 +32,6 @@ __all__ = [
     "UniversalColorCreate", "UniversalColorUpdate", "UniversalColorResponse",
     "UniversalColorListResponse", "UniversalColorForSelector",
     # H&M Color Schemas
-    "HMColorGroupCreate", "HMColorGroupResponse",
     "HMColorCreate", "HMColorUpdate", "HMColorResponse", "HMColorListResponse", "HMColorForSelector",
     # Garment Type Schemas
     "GarmentTypeCreate", "GarmentTypeUpdate", "GarmentTypeResponse",

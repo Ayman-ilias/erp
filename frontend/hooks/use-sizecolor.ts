@@ -136,35 +136,23 @@ export interface UniversalColorForSelector {
 // TYPE DEFINITIONS - H&M COLORS
 // ============================================================================
 
-export interface HMColorGroup {
-  id: number;
-  group_code: string;
-  group_name: string;
-  description?: string;
-  is_active: boolean;
-  colors?: HMColor[];
-}
-
 export interface HMColor {
   id: number;
-  hm_code: string;
-  hm_name: string;
-  group_id: number;
-  universal_color_id?: number;
-  description?: string;
+  color_code: string;
+  color_master: string;
+  color_value?: string;
+  mixed_name?: string;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
-  group?: HMColorGroup;
-  universal_color?: UniversalColor;
 }
 
 export interface HMColorForSelector {
   id: number;
-  hm_code: string;
-  hm_name: string;
-  group_name?: string;
-  hex_code?: string;
+  color_code: string;
+  color_master: string;
+  color_value?: string;
+  mixed_name?: string;
   label: string;
 }
 
@@ -224,14 +212,24 @@ export interface SizeMaster {
 
 export interface SizeMeasurement {
   id: number;
-  size_id: number;
-  measurement_spec_id: number;
+  size_master_id: number;
+  measurement_name: string;
+  measurement_code: string;
   value_cm: number;
   value_inch?: number;
+  unit_symbol: string;
+  unit_name: string;
   tolerance_plus?: number;
   tolerance_minus?: number;
   notes?: string;
+  display_order: number;
+  is_custom: boolean;
+  measurement_spec_id?: number;
+  original_value?: number;
+  original_unit?: string;
   measurement_spec?: GarmentMeasurementSpec;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SizeForSelector {
@@ -353,43 +351,37 @@ export function useDeleteUniversalColor() {
 // H&M COLOR HOOKS
 // ============================================================================
 
-export function useHMColorGroups() {
+export function useHMColors(colorMaster?: string, colorValue?: string, skip?: number, limit?: number) {
   const { token } = useAuth();
   return useQuery({
-    queryKey: ["sizecolor", "hm-colors", "groups"],
-    queryFn: () => sizeColorService.hmColors.getGroups(token!),
-    enabled: !!token,
-    staleTime: 30 * 60 * 1000,
-  });
-}
-
-export function useCreateHMColorGroup() {
-  const { token } = useAuth();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<HMColorGroup>) =>
-      sizeColorService.hmColors.createGroup(data as Record<string, any>, token!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sizecolor", "hm-colors", "groups"] });
+    queryKey: ["sizecolor", "hm-colors", colorMaster, colorValue, skip, limit],
+    queryFn: async () => {
+      const data = await sizeColorService.hmColors.getAll(token!, colorMaster, colorValue, skip, limit);
+      // Filter out UNDEFINED records on the frontend side
+      return data.filter((color: any) => 
+        color.color_master !== "UNDEFINED" && 
+        color.color_master !== null && 
+        color.color_master !== undefined
+      );
     },
-  });
-}
-
-export function useHMColors(groupId?: number, skip?: number, limit?: number) {
-  const { token } = useAuth();
-  return useQuery({
-    queryKey: ["sizecolor", "hm-colors", groupId, skip, limit],
-    queryFn: () => sizeColorService.hmColors.getAll(token!, groupId, skip, limit),
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useHMColorsForSelector(groupId?: number) {
+export function useHMColorsForSelector(colorMaster?: string) {
   const { token } = useAuth();
   return useQuery({
-    queryKey: ["sizecolor", "hm-colors", "for-selector", groupId],
-    queryFn: () => sizeColorService.hmColors.getForSelector(token!, groupId),
+    queryKey: ["sizecolor", "hm-colors", "for-selector", colorMaster],
+    queryFn: async () => {
+      const data = await sizeColorService.hmColors.getForSelector(token!, colorMaster);
+      // Filter out UNDEFINED records on the frontend side
+      return data.filter((color: any) => 
+        color.color_master !== "UNDEFINED" && 
+        color.color_master !== null && 
+        color.color_master !== undefined
+      );
+    },
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
   });
@@ -404,12 +396,12 @@ export function useHMColor(id: number) {
   });
 }
 
-export function useHMColorByCode(hmCode: string) {
+export function useHMColorByCode(colorCode: string) {
   const { token } = useAuth();
   return useQuery({
-    queryKey: ["sizecolor", "hm-colors", "by-code", hmCode],
-    queryFn: () => sizeColorService.hmColors.getByCode(hmCode, token!),
-    enabled: !!token && !!hmCode,
+    queryKey: ["sizecolor", "hm-colors", "by-code", colorCode],
+    queryFn: () => sizeColorService.hmColors.getByCode(colorCode, token!),
+    enabled: !!token && !!colorCode,
   });
 }
 

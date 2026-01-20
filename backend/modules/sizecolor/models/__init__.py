@@ -1,7 +1,6 @@
 from .sizecolor import (
     # Color Models
     UniversalColor,
-    HMColorGroup,
     HMColor,
     SampleColorSelection,
     BuyerColorUsage,
@@ -26,7 +25,6 @@ from .sizecolor import (
 __all__ = [
     # Color Models
     "UniversalColor",
-    "HMColorGroup",
     "HMColor",
     "SampleColorSelection",
     "BuyerColorUsage",

@@ -60,8 +60,15 @@ async def startup_event():
     init_db()
     logger.info("All databases initialized successfully!")
     
-    # Run migrations
+    # Run migrations using the migration tracker
     try:
+        from migrations.migration_tracker import run_all_migrations
+        run_all_migrations()
+    except Exception as e:
+        logger.error(f"Migration system error: {e}")
+        # Fallback to basic migrations if tracker fails
+        logger.info("Falling back to basic migration sequence...")
+        
         from migrations.add_buyer_types import add_buyer_types
         add_buyer_types()
         
@@ -77,9 +84,6 @@ async def startup_event():
         from migrations.add_color_size_yarn_ids_to_sample_requests import add_color_size_yarn_ids_columns
         add_color_size_yarn_ids_columns()
         
-        from migrations.seed_workflow_templates import seed_workflow_templates
-        seed_workflow_templates()
-        
         from migrations.create_color_master import create_color_master
         create_color_master()
         
@@ -89,10 +93,24 @@ async def startup_event():
         from migrations.create_uom_conversion_system import create_uom_conversion_system
         create_uom_conversion_system()
         
-        from migrations.add_performance_indexes import add_performance_indexes
-        add_performance_indexes()
+        from migrations.seed_unit_conversion_system import seed_unit_conversion_system
+        seed_unit_conversion_system()
         
-        # Settings module improvements migrations
+        from migrations.seed_sizecolor_data import seed_sizecolor_data
+        seed_sizecolor_data()
+        
+        from migrations.create_workflow_tables import create_workflow_tables
+        create_workflow_tables()
+        
+        from migrations.seed_workflow_templates import seed_workflow_templates
+        seed_workflow_templates()
+        
+        from migrations.add_priority_to_sample_tables import run_migration as add_priority_columns
+        add_priority_columns()
+        
+        from migrations.add_unit_id_columns import run_migration as add_unit_id_columns
+        add_unit_id_columns()
+        
         from migrations.add_multi_company_support import run_migration as add_multi_company
         add_multi_company()
         
@@ -101,20 +119,11 @@ async def startup_event():
         
         from migrations.create_country_port_tables import run_migration as create_country_port
         create_country_port()
-
-        # Seed Unit Conversion System data
-        from migrations.seed_unit_conversion_system import seed_unit_conversion_system
-        seed_unit_conversion_system()
-
-        # Seed Size & Color Master data
-        from migrations.seed_sizecolor_data import seed_sizecolor_data
-        seed_sizecolor_data()
-
-        logger.info("Migrations completed successfully")
-    except ImportError as e:
-        logger.warning(f"Could not import migration (may be expected): {str(e)}")
-    except Exception as e:
-        logger.warning(f"Migration warning (may already be applied): {str(e)}")
+        
+        from migrations.add_performance_indexes import add_performance_indexes
+        add_performance_indexes()
+        
+        logger.info("Basic migrations completed")
 
     # Initialize sample data in users database
     from core.database import SessionLocalUsers
@@ -151,6 +160,7 @@ from modules.notifications import router as notifications_router
 from modules.workflows import workflow_router
 from modules.units.routes import router as units_router
 from modules.sizecolor.routes import sizecolor_router
+from modules.admin import admin_router
 
 # Register routers
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
@@ -174,6 +184,7 @@ app.include_router(notifications_router, prefix=f"{settings.API_V1_STR}/notifica
 app.include_router(workflow_router, prefix=f"{settings.API_V1_STR}", tags=["workflows"])
 app.include_router(units_router, prefix=f"{settings.API_V1_STR}", tags=["unit-conversion"])
 app.include_router(sizecolor_router, prefix=f"{settings.API_V1_STR}/sizecolor", tags=["size-color-master"])
+app.include_router(admin_router, prefix=f"{settings.API_V1_STR}", tags=["admin"])
 
 # Mount static files for uploaded content (logos, attachments, etc.)
 # Create uploads directory if it doesn't exist

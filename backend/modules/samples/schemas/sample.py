@@ -515,6 +515,28 @@ class SampleRequestResponse(SampleRequestBase):
     # Workflow information (Requirements 10.2, 10.3)
     workflow_status: Optional[dict] = None
 
+    @field_validator('decorative_part', mode='before')
+    @classmethod
+    def normalize_decorative_part(cls, v):
+        """Convert decorative_part to list if it's a string"""
+        if v is None or v == '':
+            return None
+        if isinstance(v, str):
+            items = [item.strip() for item in v.split(',') if item.strip()]
+            return items if items else None
+        return v
+    
+    @field_validator('additional_instruction', mode='before')
+    @classmethod
+    def normalize_additional_instruction(cls, v):
+        """Convert additional_instruction to list if it's a string"""
+        if v is None or v == '':
+            return None
+        if isinstance(v, str):
+            lines = [line.strip() for line in v.split('\n') if line.strip()]
+            return lines if lines else None
+        return v
+
     class Config:
         from_attributes = True
 

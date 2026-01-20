@@ -3617,35 +3617,25 @@ export const sizeColorService = {
   },
 
   // ============================================================================
-  // H&M COLORS (Proprietary 5-digit codes XX-XXX)
+  // H&M COLORS (Simplified structure with color_code, color_master, color_value, mixed_name)
   // ============================================================================
   hmColors: {
-    // H&M Color Groups (01-09 Achromatic, 10-19 Red, etc.)
-    getGroups: async (token: string) => {
-      const basePath = getBasePath();
-      return getAPIResponse(basePath, `/sizecolor/colors/hm/groups`, token, "GET");
-    },
-
-    createGroup: async (data: Record<string, any>, token: string) => {
-      const basePath = getBasePath();
-      return getAPIResponse(basePath, `/sizecolor/colors/hm/groups`, token, "POST", JSON.stringify(data));
-    },
-
     // H&M Colors
-    getAll: async (token: string, groupId?: number, skip?: number, limit?: number) => {
+    getAll: async (token: string, colorMaster?: string, colorValue?: string, skip?: number, limit?: number) => {
       const basePath = getBasePath();
       const params = new URLSearchParams();
-      if (groupId) params.append("group_id", String(groupId));
+      if (colorMaster) params.append("color_master", colorMaster);
+      if (colorValue) params.append("color_value", colorValue);
       if (skip !== undefined) params.append("skip", String(skip));
       if (limit !== undefined) params.append("limit", String(limit));
       const queryString = params.toString();
       return getAPIResponse(basePath, `/sizecolor/colors/hm${queryString ? `?${queryString}` : ""}`, token, "GET");
     },
 
-    getForSelector: async (token: string, groupId?: number) => {
+    getForSelector: async (token: string, colorMaster?: string) => {
       const basePath = getBasePath();
       const params = new URLSearchParams();
-      if (groupId) params.append("group_id", String(groupId));
+      if (colorMaster) params.append("color_master", colorMaster);
       const queryString = params.toString();
       return getAPIResponse(basePath, `/sizecolor/colors/hm/for-selector${queryString ? `?${queryString}` : ""}`, token, "GET");
     },
@@ -3655,9 +3645,9 @@ export const sizeColorService = {
       return getAPIResponse(basePath, `/sizecolor/colors/hm/${id}`, token, "GET");
     },
 
-    getByCode: async (hmCode: string, token: string) => {
+    getByCode: async (colorCode: string, token: string) => {
       const basePath = getBasePath();
-      return getAPIResponse(basePath, `/sizecolor/colors/hm/by-code/${encodeURIComponent(hmCode)}`, token, "GET");
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/by-code/${encodeURIComponent(colorCode)}`, token, "GET");
     },
 
     create: async (data: Record<string, any>, token: string) => {
@@ -3673,6 +3663,20 @@ export const sizeColorService = {
     delete: async (id: number, token: string) => {
       const basePath = getBasePath();
       return getAPIResponse(basePath, `/sizecolor/colors/hm/${id}`, token, "DELETE");
+    },
+
+    // Statistics and utilities
+    getStats: async (token: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/stats`, token, "GET");
+    },
+
+    search: async (query: string, limit: number, token: string) => {
+      const basePath = getBasePath();
+      const params = new URLSearchParams();
+      params.append("q", query);
+      params.append("limit", String(limit));
+      return getAPIResponse(basePath, `/sizecolor/colors/hm/search?${params.toString()}`, token, "GET");
     },
   },
 

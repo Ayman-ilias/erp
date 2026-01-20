@@ -222,43 +222,14 @@ class UniversalColorForSelector(BaseModel):
 
 
 # =============================================================================
-# H&M COLOR SCHEMAS
+# H&M COLOR SCHEMAS (Simplified structure based on Excel)
 # =============================================================================
 
-class HMColorGroupBase(BaseModel):
-    group_code: str = Field(..., max_length=2)
-    group_name: str = Field(..., max_length=50)
-    group_range_start: Optional[int] = None
-    group_range_end: Optional[int] = None
-    description: Optional[str] = None
-    hex_sample: Optional[str] = Field(None, max_length=7)
-
-
-class HMColorGroupCreate(HMColorGroupBase):
-    pass
-
-
-class HMColorGroupResponse(HMColorGroupBase):
-    id: int
-    is_active: bool
-    display_order: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class HMColorBase(BaseModel):
-    hm_code: str = Field(..., max_length=10)  # e.g., "09-090"
-    hm_name: str = Field(..., max_length=100)
-    group_id: Optional[int] = None
-    universal_color_id: Optional[int] = None
-    hex_code: Optional[str] = Field(None, max_length=7)
-    rgb_r: Optional[int] = Field(None, ge=0, le=255)
-    rgb_g: Optional[int] = Field(None, ge=0, le=255)
-    rgb_b: Optional[int] = Field(None, ge=0, le=255)
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    color_code: str = Field(..., max_length=20)  # e.g., "51-138"
+    color_master: str = Field(..., max_length=100)  # e.g., "BEIGE"
+    color_value: Optional[str] = Field(None, max_length=100)  # e.g., "MEDIUM DUSTY"
+    mixed_name: Optional[str] = Field(None, max_length=200)  # e.g., "BEIGE MEDIUM DUSTY"
 
 
 class HMColorCreate(HMColorBase):
@@ -266,16 +237,10 @@ class HMColorCreate(HMColorBase):
 
 
 class HMColorUpdate(BaseModel):
-    hm_code: Optional[str] = Field(None, max_length=10)
-    hm_name: Optional[str] = Field(None, max_length=100)
-    group_id: Optional[int] = None
-    universal_color_id: Optional[int] = None
-    hex_code: Optional[str] = Field(None, max_length=7)
-    rgb_r: Optional[int] = Field(None, ge=0, le=255)
-    rgb_g: Optional[int] = Field(None, ge=0, le=255)
-    rgb_b: Optional[int] = Field(None, ge=0, le=255)
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    color_code: Optional[str] = Field(None, max_length=20)
+    color_master: Optional[str] = Field(None, max_length=100)
+    color_value: Optional[str] = Field(None, max_length=100)
+    mixed_name: Optional[str] = Field(None, max_length=200)
     is_active: Optional[bool] = None
 
 
@@ -284,7 +249,6 @@ class HMColorResponse(HMColorBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    color_group: Optional[HMColorGroupResponse] = None
 
     class Config:
         from_attributes = True
@@ -292,11 +256,10 @@ class HMColorResponse(HMColorBase):
 
 class HMColorListResponse(BaseModel):
     id: int
-    hm_code: str
-    hm_name: str
-    group_id: Optional[int] = None
-    group_name: Optional[str] = None
-    hex_code: Optional[str] = None
+    color_code: str
+    color_master: str
+    color_value: Optional[str] = None
+    mixed_name: Optional[str] = None
     is_active: bool
     created_at: datetime
 
@@ -307,11 +270,11 @@ class HMColorListResponse(BaseModel):
 class HMColorForSelector(BaseModel):
     """Optimized for dropdown selectors"""
     id: int
-    hm_code: str
-    hm_name: str
-    hex_code: Optional[str] = None
-    group_name: Optional[str] = None
-    label: str
+    color_code: str
+    color_master: str
+    color_value: Optional[str] = None
+    mixed_name: Optional[str] = None
+    label: str  # Combined display label
 
     class Config:
         from_attributes = True
@@ -411,10 +374,16 @@ class SizeMeasurementBase(BaseModel):
     measurement_name: str = Field(..., max_length=50)
     measurement_code: str = Field(..., max_length=20)
     value_cm: float
+    unit_symbol: str = Field(default="cm", max_length=10)
+    unit_name: str = Field(default="Centimeter", max_length=50)
     tolerance_plus: float = 2.0
     tolerance_minus: float = 2.0
     notes: Optional[str] = None
     display_order: int = 0
+    is_custom: bool = False
+    measurement_spec_id: Optional[int] = None
+    original_value: Optional[float] = None
+    original_unit: Optional[str] = Field(None, max_length=10)
 
 
 class SizeMeasurementCreate(SizeMeasurementBase):
@@ -425,16 +394,23 @@ class SizeMeasurementUpdate(BaseModel):
     measurement_name: Optional[str] = Field(None, max_length=50)
     measurement_code: Optional[str] = Field(None, max_length=20)
     value_cm: Optional[float] = None
+    unit_symbol: Optional[str] = Field(None, max_length=10)
+    unit_name: Optional[str] = Field(None, max_length=50)
     tolerance_plus: Optional[float] = None
     tolerance_minus: Optional[float] = None
     notes: Optional[str] = None
     display_order: Optional[int] = None
+    is_custom: Optional[bool] = None
+    measurement_spec_id: Optional[int] = None
+    original_value: Optional[float] = None
+    original_unit: Optional[str] = Field(None, max_length=10)
 
 
 class SizeMeasurementResponse(SizeMeasurementBase):
     id: int
     size_master_id: int
     value_inch: Optional[float] = None
+    measurement_spec: Optional[GarmentMeasurementSpecResponse] = None
     created_at: datetime
     updated_at: datetime
 

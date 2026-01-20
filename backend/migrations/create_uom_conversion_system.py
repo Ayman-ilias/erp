@@ -47,10 +47,10 @@ def create_uom_conversion_system():
             category_ids = {}
             for cat_name, base_unit, formula_desc in categories:
                 result = conn.execute(text("""
-                    INSERT INTO uom_category (name, base_unit, conversion_formula, is_active)
-                    VALUES (:name, :base_unit, :formula, TRUE)
-                    ON CONFLICT (name) DO UPDATE 
-                    SET base_unit = :base_unit, conversion_formula = :formula
+                    INSERT INTO uom_category (uom_category, uom_name, base_unit, conversion_formula, is_active)
+                    VALUES (:name, :name, :base_unit, :formula, TRUE)
+                    ON CONFLICT (uom_category) DO UPDATE 
+                    SET base_unit = :base_unit, conversion_formula = :formula, uom_name = :name
                     RETURNING id
                 """), {
                     'name': cat_name,
@@ -125,8 +125,8 @@ def create_uom_conversion_system():
                     VALUES (
                         :category_id, :name, :symbol, :conversion, :is_base, TRUE
                     )
-                    ON CONFLICT (name) DO UPDATE 
-                    SET conversion_to_base = :conversion, is_base_unit = :is_base
+                    ON CONFLICT (category_id, symbol) DO UPDATE 
+                    SET name = :name, conversion_to_base = :conversion, is_base_unit = :is_base
                 """), {
                     'category_id': category_ids[category_name],
                     'name': unit_name,

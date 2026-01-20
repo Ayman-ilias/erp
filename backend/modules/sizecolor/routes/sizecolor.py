@@ -21,7 +21,7 @@ from datetime import datetime
 from core.database import get_db_sizecolor
 from modules.sizecolor.models.sizecolor import (
     # Models
-    UniversalColor, HMColorGroup, HMColor,
+    UniversalColor, HMColor,
     GarmentType, GarmentMeasurementSpec,
     SizeMaster, SizeMeasurement,
     SampleColorSelection, SampleSizeSelection,
@@ -35,7 +35,6 @@ from modules.sizecolor.schemas.sizecolor import (
     UniversalColorCreate, UniversalColorUpdate, UniversalColorResponse,
     UniversalColorListResponse, UniversalColorForSelector,
     # H&M Color
-    HMColorGroupCreate, HMColorGroupResponse,
     HMColorCreate, HMColorUpdate, HMColorResponse, HMColorListResponse, HMColorForSelector,
     # Garment Type
     GarmentTypeCreate, GarmentTypeUpdate, GarmentTypeResponse,
@@ -260,105 +259,86 @@ def delete_universal_color(color_id: int, db: Session = Depends(get_db_sizecolor
 
 
 # =============================================================================
-# H&M COLOR GROUP ROUTES
-# =============================================================================
-
-@router.get("/colors/hm/groups", response_model=List[HMColorGroupResponse], tags=["hm-colors"])
-def list_hm_color_groups(db: Session = Depends(get_db_sizecolor)):
-    """List all H&M color groups"""
-    groups = db.query(HMColorGroup).filter(HMColorGroup.is_active == True).order_by(HMColorGroup.display_order).all()
-    return groups
-
-
-@router.post("/colors/hm/groups", response_model=HMColorGroupResponse, tags=["hm-colors"])
-def create_hm_color_group(group_data: HMColorGroupCreate, db: Session = Depends(get_db_sizecolor)):
-    """Create a new H&M color group"""
-    existing = db.query(HMColorGroup).filter(HMColorGroup.group_code == group_data.group_code).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Group code already exists")
-
-    group = HMColorGroup(**group_data.model_dump())
-    db.add(group)
-    db.commit()
-    db.refresh(group)
-    return group
-
-
-# =============================================================================
-# H&M COLOR ROUTES
+# H&M COLOR ROUTES (Updated for simplified structure)
 # =============================================================================
 
 @router.get("/colors/hm", response_model=List[HMColorListResponse], tags=["hm-colors"])
 def list_hm_colors(
-    group_id: Optional[int] = Query(None),
+    color_master: Optional[str] = Query(None),
+    color_value: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    include_undefined: bool = Query(False, description="Include UNDEFINED records"),
     db: Session = Depends(get_db_sizecolor)
 ):
-    """List all H&M colors with filtering"""
-    query = db.query(HMColor).options(joinedload(HMColor.color_group))
+    """List all H&M colors with filtering - UPDATED VERSION"""
+    query = db.query(HMColor)
 
-    if group_id:
-        query = query.filter(HMColor.group_id == group_id)
+    # Filter out UNDEFINED and NULL records by default unless explicitly requested
+    if not include_undefined:
+        query = query.filter(
+            HMColor.color_master != "UNDEFINED",
+            HMColor.color_master.isnot(None)
+        )
+
+    if color_master:
+        query = query.filter(HMColor.color_master.ilike(f"%{color_master}%"))
+    
+    if color_value:
+        query = query.filter(HMColor.color_value.ilike(f"%{color_value}%"))
+
     if is_active is not None:
         query = query.filter(HMColor.is_active == is_active)
+
     if search:
         query = query.filter(
             or_(
-                HMColor.hm_code.ilike(f"%{search}%"),
-                HMColor.hm_name.ilike(f"%{search}%"),
+                HMColor.color_code.ilike(f"%{search}%"),
+                HMColor.color_master.ilike(f"%{search}%"),
+                HMColor.color_value.ilike(f"%{search}%"),
+                HMColor.mixed_name.ilike(f"%{search}%"),
             )
         )
 
-    colors = query.order_by(HMColor.hm_code).offset(skip).limit(limit).all()
-
-    return [
-        HMColorListResponse(
-            id=c.id,
-            hm_code=c.hm_code,
-            hm_name=c.hm_name,
-            group_id=c.group_id,
-            group_name=c.color_group.group_name if c.color_group else None,
-            hex_code=c.hex_code,
-            is_active=c.is_active,
-            created_at=c.created_at,
-        )
-        for c in colors
-    ]
+    colors = query.order_by(HMColor.color_master, HMColor.color_code).offset(skip).limit(limit).all()
+    return colors
 
 
 @router.get("/colors/hm/for-selector", response_model=List[HMColorForSelector], tags=["hm-colors"])
 def get_hm_colors_for_selector(
-    group_id: Optional[int] = Query(None),
+    color_master: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db_sizecolor)
 ):
     """Get H&M colors optimized for dropdown selectors"""
-    query = db.query(HMColor).options(joinedload(HMColor.color_group)).filter(HMColor.is_active == True)
+    query = db.query(HMColor).filter(HMColor.is_active == True)
 
-    if group_id:
-        query = query.filter(HMColor.group_id == group_id)
+    if color_master:
+        query = query.filter(HMColor.color_master.ilike(f"%{color_master}%"))
+
     if search:
         query = query.filter(
             or_(
-                HMColor.hm_code.ilike(f"%{search}%"),
-                HMColor.hm_name.ilike(f"%{search}%"),
+                HMColor.color_code.ilike(f"%{search}%"),
+                HMColor.color_master.ilike(f"%{search}%"),
+                HMColor.color_value.ilike(f"%{search}%"),
+                HMColor.mixed_name.ilike(f"%{search}%"),
             )
         )
 
-    colors = query.order_by(HMColor.hm_code).limit(limit).all()
+    colors = query.order_by(HMColor.color_code).limit(limit).all()
 
     return [
         HMColorForSelector(
             id=c.id,
-            hm_code=c.hm_code,
-            hm_name=c.hm_name,
-            hex_code=c.hex_code,
-            group_name=c.color_group.group_name if c.color_group else None,
-            label=f"{c.hm_code} - {c.hm_name}"
+            color_code=c.color_code,
+            color_master=c.color_master,
+            color_value=c.color_value,
+            mixed_name=c.mixed_name,
+            label=f"{c.color_code} - {c.mixed_name or c.color_master}"
         )
         for c in colors
     ]
@@ -367,53 +347,38 @@ def get_hm_colors_for_selector(
 @router.get("/colors/hm/{color_id}", response_model=HMColorResponse, tags=["hm-colors"])
 def get_hm_color(color_id: int, db: Session = Depends(get_db_sizecolor)):
     """Get a single H&M color"""
-    color = db.query(HMColor).options(joinedload(HMColor.color_group)).filter(HMColor.id == color_id).first()
+    color = db.query(HMColor).filter(HMColor.id == color_id).first()
+    
     if not color:
         raise HTTPException(status_code=404, detail="H&M color not found")
+    
     return color
 
 
-@router.get("/colors/hm/by-code/{hm_code}", response_model=HMColorResponse, tags=["hm-colors"])
-def get_hm_color_by_code(hm_code: str, db: Session = Depends(get_db_sizecolor)):
-    """Get H&M color by H&M code (e.g., 09-090)"""
-    color = db.query(HMColor).options(joinedload(HMColor.color_group)).filter(HMColor.hm_code == hm_code).first()
+@router.get("/colors/hm/by-code/{color_code}", response_model=HMColorResponse, tags=["hm-colors"])
+def get_hm_color_by_code(color_code: str, db: Session = Depends(get_db_sizecolor)):
+    """Get H&M color by color code (e.g., 51-138)"""
+    color = db.query(HMColor).filter(HMColor.color_code == color_code).first()
+    
     if not color:
         raise HTTPException(status_code=404, detail="H&M color not found for this code")
+    
     return color
 
 
 @router.post("/colors/hm", response_model=HMColorResponse, tags=["hm-colors"])
 def create_hm_color(color_data: HMColorCreate, db: Session = Depends(get_db_sizecolor)):
     """Create a new H&M color"""
-    existing = db.query(HMColor).filter(HMColor.hm_code == color_data.hm_code).first()
+    # Check if color code already exists
+    existing = db.query(HMColor).filter(HMColor.color_code == color_data.color_code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="H&M code already exists")
+        raise HTTPException(status_code=400, detail="Color code already exists")
 
-    # Parse RGB from hex if provided but RGB not
-    rgb_r = color_data.rgb_r
-    rgb_g = color_data.rgb_g
-    rgb_b = color_data.rgb_b
-    if color_data.hex_code and (rgb_r is None or rgb_g is None or rgb_b is None):
-        hex_clean = color_data.hex_code.lstrip('#')
-        rgb_r = int(hex_clean[0:2], 16)
-        rgb_g = int(hex_clean[2:4], 16)
-        rgb_b = int(hex_clean[4:6], 16)
-
-    color = HMColor(
-        hm_code=color_data.hm_code,
-        hm_name=color_data.hm_name,
-        group_id=color_data.group_id,
-        universal_color_id=color_data.universal_color_id,
-        hex_code=color_data.hex_code.upper() if color_data.hex_code else None,
-        rgb_r=rgb_r,
-        rgb_g=rgb_g,
-        rgb_b=rgb_b,
-        description=color_data.description,
-        notes=color_data.notes,
-    )
+    color = HMColor(**color_data.model_dump())
     db.add(color)
     db.commit()
     db.refresh(color)
+    
     return color
 
 
@@ -424,21 +389,20 @@ def update_hm_color(color_id: int, color_data: HMColorUpdate, db: Session = Depe
     if not color:
         raise HTTPException(status_code=404, detail="H&M color not found")
 
+    # Check if color code is being changed and if it already exists
+    if color_data.color_code and color_data.color_code != color.color_code:
+        existing = db.query(HMColor).filter(HMColor.color_code == color_data.color_code).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Color code already exists")
+
+    # Update fields
     update_data = color_data.model_dump(exclude_unset=True)
-
-    # Update RGB from hex if hex changed
-    if "hex_code" in update_data and update_data["hex_code"]:
-        hex_clean = update_data["hex_code"].lstrip('#')
-        update_data["rgb_r"] = int(hex_clean[0:2], 16)
-        update_data["rgb_g"] = int(hex_clean[2:4], 16)
-        update_data["rgb_b"] = int(hex_clean[4:6], 16)
-        update_data["hex_code"] = update_data["hex_code"].upper()
-
     for field, value in update_data.items():
         setattr(color, field, value)
 
     db.commit()
     db.refresh(color)
+    
     return color
 
 
@@ -451,7 +415,58 @@ def delete_hm_color(color_id: int, db: Session = Depends(get_db_sizecolor)):
 
     db.delete(color)
     db.commit()
+    
     return {"message": "H&M color deleted successfully"}
+
+
+# =============================================================================
+# H&M COLOR STATISTICS AND UTILITIES
+# =============================================================================
+
+@router.get("/colors/hm/stats", tags=["hm-colors"])
+def get_hm_color_stats(db: Session = Depends(get_db_sizecolor)):
+    """Get H&M color statistics"""
+    total_colors = db.query(func.count(HMColor.id)).scalar()
+    active_colors = db.query(func.count(HMColor.id)).filter(HMColor.is_active == True).scalar()
+    
+    # Group by color master
+    color_master_stats = db.query(
+        HMColor.color_master,
+        func.count(HMColor.id).label('count')
+    ).group_by(HMColor.color_master).order_by(desc('count')).limit(10).all()
+    
+    # Group by color value
+    color_value_stats = db.query(
+        HMColor.color_value,
+        func.count(HMColor.id).label('count')
+    ).filter(HMColor.color_value.isnot(None)).group_by(HMColor.color_value).order_by(desc('count')).limit(10).all()
+    
+    return {
+        "total_colors": total_colors,
+        "active_colors": active_colors,
+        "inactive_colors": total_colors - active_colors,
+        "top_color_masters": [{"name": stat[0], "count": stat[1]} for stat in color_master_stats],
+        "top_color_values": [{"name": stat[0], "count": stat[1]} for stat in color_value_stats]
+    }
+
+
+@router.get("/colors/hm/search", response_model=List[HMColorListResponse], tags=["hm-colors"])
+def search_hm_colors(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db_sizecolor)
+):
+    """Search H&M colors by any field"""
+    colors = db.query(HMColor).filter(
+        or_(
+            HMColor.color_code.ilike(f"%{q}%"),
+            HMColor.color_master.ilike(f"%{q}%"),
+            HMColor.color_value.ilike(f"%{q}%"),
+            HMColor.mixed_name.ilike(f"%{q}%"),
+        )
+    ).filter(HMColor.is_active == True).order_by(HMColor.color_code).limit(limit).all()
+    
+    return colors
 
 
 # =============================================================================
@@ -789,10 +804,16 @@ def create_size(size_data: SizeMasterCreate, db: Session = Depends(get_db_sizeco
                 measurement_code=m_data.measurement_code,
                 value_cm=m_data.value_cm,
                 value_inch=round(m_data.value_cm / 2.54, 2),
+                unit_symbol=m_data.unit_symbol,
+                unit_name=m_data.unit_name,
                 tolerance_plus=m_data.tolerance_plus,
                 tolerance_minus=m_data.tolerance_minus,
                 notes=m_data.notes,
                 display_order=m_data.display_order,
+                is_custom=m_data.is_custom,
+                measurement_spec_id=m_data.measurement_spec_id,
+                original_value=m_data.original_value,
+                original_unit=m_data.original_unit,
             )
             db.add(measurement)
 
@@ -846,10 +867,16 @@ def add_size_measurement(size_id: int, data: SizeMeasurementCreate, db: Session 
         measurement_code=data.measurement_code,
         value_cm=data.value_cm,
         value_inch=round(data.value_cm / 2.54, 2),
+        unit_symbol=data.unit_symbol,
+        unit_name=data.unit_name,
         tolerance_plus=data.tolerance_plus,
         tolerance_minus=data.tolerance_minus,
         notes=data.notes,
         display_order=data.display_order,
+        is_custom=data.is_custom,
+        measurement_spec_id=data.measurement_spec_id,
+        original_value=data.original_value,
+        original_unit=data.original_unit,
     )
     db.add(measurement)
     db.commit()
