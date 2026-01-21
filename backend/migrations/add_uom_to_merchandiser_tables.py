@@ -24,7 +24,7 @@ def add_uom_columns():
         
         for table_name, default_value in tables_to_update:
             try:
-                # Check if column exists
+                # Check if uom column exists
                 result = db.execute(text(f"""
                     SELECT column_name 
                     FROM information_schema.columns 
@@ -33,7 +33,7 @@ def add_uom_columns():
                 """))
                 
                 if not result.fetchone():
-                    # Add the column
+                    # Add the uom column
                     logger.info(f"Adding uom column to {table_name}")
                     db.execute(text(f"""
                         ALTER TABLE {table_name} 
@@ -43,9 +43,29 @@ def add_uom_columns():
                     logger.info(f"Successfully added uom column to {table_name}")
                 else:
                     logger.info(f"uom column already exists in {table_name}")
+                
+                # Check if unit_id column exists
+                result = db.execute(text(f"""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = '{table_name}' 
+                    AND column_name = 'unit_id'
+                """))
+                
+                if not result.fetchone():
+                    # Add the unit_id column
+                    logger.info(f"Adding unit_id column to {table_name}")
+                    db.execute(text(f"""
+                        ALTER TABLE {table_name} 
+                        ADD COLUMN unit_id INTEGER NOT NULL DEFAULT 1
+                    """))
+                    db.commit()
+                    logger.info(f"Successfully added unit_id column to {table_name}")
+                else:
+                    logger.info(f"unit_id column already exists in {table_name}")
                     
             except Exception as e:
-                logger.error(f"Error adding uom column to {table_name}: {e}")
+                logger.error(f"Error adding columns to {table_name}: {e}")
                 db.rollback()
                 
         logger.info("UoM columns migration completed")
