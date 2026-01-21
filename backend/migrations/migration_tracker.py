@@ -334,6 +334,10 @@ def run_all_migrations():
         from migrations.add_performance_indexes import add_performance_indexes
         tracker.run_migration("add_performance_indexes", add_performance_indexes)
         
+        # Phase 12: Comprehensive color data import
+        from migrations.import_comprehensive_colors import run_migration as import_comprehensive_colors
+        tracker.run_migration("import_comprehensive_colors", import_comprehensive_colors)
+        
         logger.info("=" * 80)
         logger.info("MIGRATION SEQUENCE COMPLETED")
         logger.info("=" * 80)
