@@ -379,7 +379,9 @@ export function useHMColorsForSelector(colorMaster?: string) {
       return data.filter((color: any) => 
         color.color_master !== "UNDEFINED" && 
         color.color_master !== null && 
-        color.color_master !== undefined
+        color.color_master !== undefined &&
+        color.color_master.trim() !== "" &&
+        color.color_master !== "NULL"
       );
     },
     enabled: !!token,

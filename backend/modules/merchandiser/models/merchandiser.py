@@ -73,7 +73,7 @@ class FabricDetail(Base):
 class TrimsDetail(Base):
     """
     Trims Details - 7 fields
-    Fields: Product ID, Product Name, Category, Sub-Category, UoM,
+    Fields: Product ID, Product Name, Category, Sub-Category, Unit ID,
             Consumable Flag, Remarks
     """
     __tablename__ = "trims_details"
@@ -83,7 +83,7 @@ class TrimsDetail(Base):
     product_name = Column(String, nullable=False)  # Product Name
     category = Column(String, nullable=True)  # Category (Button, Thread, etc.)
     sub_category = Column(String, nullable=True)  # Sub-Category
-    uom = Column(String, nullable=False, default="piece")  # Unit of Measure
+    unit_id = Column(Integer, nullable=False, default=1)  # Unit ID (reference to units system)
     consumable_flag = Column(Boolean, default=True)  # Consumable Flag
     remarks = Column(Text, nullable=True)  # Remarks
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -93,7 +93,7 @@ class TrimsDetail(Base):
 class AccessoriesDetail(Base):
     """
     Accessories Details - 7 fields
-    Fields: Product ID, Product Name, Category, Sub-Category, UoM,
+    Fields: Product ID, Product Name, Category, Sub-Category, Unit ID,
             Consumable Flag, Remarks
     """
     __tablename__ = "accessories_details"
@@ -103,7 +103,7 @@ class AccessoriesDetail(Base):
     product_name = Column(String, nullable=False)  # Product Name
     category = Column(String, nullable=True)  # Category
     sub_category = Column(String, nullable=True)  # Sub-Category
-    uom = Column(String, nullable=False, default="piece")  # Unit of Measure
+    unit_id = Column(Integer, nullable=False, default=1)  # Unit ID (reference to units system)
     consumable_flag = Column(Boolean, default=True)  # Consumable Flag
     remarks = Column(Text, nullable=True)  # Remarks
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -113,7 +113,7 @@ class AccessoriesDetail(Base):
 class FinishedGoodDetail(Base):
     """
     Finished Good Details - 7 fields
-    Fields: Product ID, Product Name, Category, Sub-Category, UoM,
+    Fields: Product ID, Product Name, Category, Sub-Category, Unit ID,
             Consumable Flag, Remarks
     """
     __tablename__ = "finished_good_details"
@@ -123,7 +123,7 @@ class FinishedGoodDetail(Base):
     product_name = Column(String, nullable=False)  # Product Name
     category = Column(String, nullable=True)  # Category
     sub_category = Column(String, nullable=True)  # Sub-Category
-    uom = Column(String, nullable=False, default="piece")  # Unit of Measure
+    unit_id = Column(Integer, nullable=False, default=1)  # Unit ID (reference to units system)
     consumable_flag = Column(Boolean, default=True)  # Consumable Flag
     remarks = Column(Text, nullable=True)  # Remarks
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -133,7 +133,7 @@ class FinishedGoodDetail(Base):
 class PackingGoodDetail(Base):
     """
     Packing Good Details - 12 fields
-    Fields: Product ID, Product Name, Category, Sub-Category, UoM,
+    Fields: Product ID, Product Name, Category, Sub-Category, Unit ID,
             Consumable Flag, Carton Dimensions (L/W/H), Carton Weight, Remarks
     """
     __tablename__ = "packing_good_details"
@@ -143,7 +143,7 @@ class PackingGoodDetail(Base):
     product_name = Column(String, nullable=False)  # Product Name
     category = Column(String, nullable=True)  # Category (Poly Bag, Carton, etc.)
     sub_category = Column(String, nullable=True)  # Sub-Category
-    uom = Column(String, nullable=False, default="piece")  # Unit of Measure
+    unit_id = Column(Integer, nullable=False, default=1)  # Unit ID (reference to units system)
     consumable_flag = Column(Boolean, default=True)  # Consumable Flag
     carton_length = Column(Float, nullable=True)  # Carton length in cm
     carton_width = Column(Float, nullable=True)  # Carton width in cm

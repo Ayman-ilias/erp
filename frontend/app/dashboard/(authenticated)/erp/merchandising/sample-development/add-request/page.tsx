@@ -23,10 +23,8 @@ import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ColorSelector, type SelectedColor } from "@/components/sizecolor/ColorSelector";
-import { SizeSelector, type SelectedSize } from "@/components/sizecolor/SizeSelector";
-import { EnhancedColorSelector, type EnhancedSelectedColor } from "@/components/sizecolor/EnhancedColorSelector";
-import { EnhancedSizeSelector, type EnhancedSelectedSize } from "@/components/sizecolor/EnhancedSizeSelector";
+import { SimpleColorSelector, type SimpleSelectedColor } from "@/components/sizecolor/SimpleColorSelector";
+import { SimpleSizeSelector, type SimpleSelectedSize } from "@/components/sizecolor/SimpleSizeSelector";
 
 const DEFAULT_SAMPLE_CATEGORIES = ["Proto", "Fit", "PP", "SMS", "TOP", "Salesman", "Photo Shoot", "Production"];
 
@@ -212,16 +210,12 @@ export default function AddSampleRequestPage() {
     techpack_files: [] as Array<{url: string, filename: string, type: string}>,  // Array of techpack files
   });
 
-  // New color and size selection state using the redesigned components
-  const [selectedColors, setSelectedColors] = useState<SelectedColor[]>([]);
-  const [selectedSizes, setSelectedSizes] = useState<SelectedSize[]>([]);
+  // New simple color and size selection state
+  const [simpleSelectedColors, setSimpleSelectedColors] = useState<SimpleSelectedColor[]>([]);
+  const [simpleSelectedSizes, setSimpleSelectedSizes] = useState<SimpleSelectedSize[]>([]);
 
-  // Enhanced color and size selection state using the enhanced components
-  const [enhancedSelectedColors, setEnhancedSelectedColors] = useState<EnhancedSelectedColor[]>([]);
-  const [enhancedSelectedSizes, setEnhancedSelectedSizes] = useState<EnhancedSelectedSize[]>([]);
-
-  // Feature flag to switch between legacy and enhanced selectors
-  const [useEnhancedSelectors, setUseEnhancedSelectors] = useState(true);
+  // Feature flag to switch between legacy and simple selectors
+  const [useSimpleSelectors, setUseSimpleSelectors] = useState(true);
 
   const [buyerOpen, setBuyerOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");
@@ -505,36 +499,22 @@ export default function AddSampleRequestPage() {
         : null,
       techpack_files: formData.techpack_files && formData.techpack_files.length > 0 ? formData.techpack_files : null,
 
-      // Enhanced color selection data from EnhancedColorSelector component
-      selected_colors: useEnhancedSelectors && enhancedSelectedColors.length > 0 ? enhancedSelectedColors.map(c => ({
+      // Simple color selection data from SimpleColorSelector component
+      selected_colors: simpleSelectedColors.length > 0 ? simpleSelectedColors.map(c => ({
         color_id: c.id,
-        color_type: "universal", // Enhanced selector uses universal colors
-        color_code: c.color_code,
-        color_name: c.color_name,
-        hex_code: c.hex_code,
-        display_name: c.display_name || c.color_name,
-        pantone_code: c.pantone_code,
-        ral_code: c.ral_code,
-        color_family: c.color_family,
-        color_category: c.color_category
-      })) : selectedColors.length > 0 ? selectedColors.map(c => ({
-        color_id: c.id,
-        color_type: c.type,  // "universal" or "hm"
+        color_type: c.type === "hm" ? "hm" : "universal",
         color_code: c.code,
         color_name: c.name,
         hex_code: c.hex_code,
+        display_name: c.display_name,
       })) : null,
 
       // Legacy color_ids for backward compatibility
-      color_ids: useEnhancedSelectors 
-        ? enhancedSelectedColors.map(c => c.id)
-        : selectedColors.filter(c => c.type === "universal").map(c => c.id),
-      color_name: useEnhancedSelectors
-        ? enhancedSelectedColors.map(c => c.color_name).join(", ") || null
-        : selectedColors.map(c => c.name).join(", ") || null,
+      color_ids: simpleSelectedColors.filter(c => c.type !== "hm").map(c => c.id),
+      color_name: simpleSelectedColors.map(c => c.name).join(", ") || null,
 
-      // Enhanced size selection data from EnhancedSizeSelector component
-      selected_sizes: useEnhancedSelectors && enhancedSelectedSizes.length > 0 ? enhancedSelectedSizes.map(s => ({
+      // Simple size selection data from SimpleSizeSelector component
+      selected_sizes: simpleSelectedSizes.length > 0 ? simpleSelectedSizes.map(s => ({
         size_id: s.id,
         size_code: s.size_code,
         size_name: s.size_name,
@@ -544,27 +524,12 @@ export default function AddSampleRequestPage() {
         gender: s.gender,
         age_group: s.age_group,
         fit_type: s.fit_type,
-        measurements: s.measurements
-      })) : selectedSizes.length > 0 ? selectedSizes.map(s => ({
-        size_id: s.id,
-        size_code: s.size_code,
-        size_name: s.size_name,
-        garment_type_name: s.garment_type_name,
-        gender: s.gender,
-        age_group: s.age_group,
-        fit_type: s.fit_type,
       })) : null,
 
       // Legacy size_id and size_name for backward compatibility
-      size_id: useEnhancedSelectors
-        ? (enhancedSelectedSizes.length > 0 ? enhancedSelectedSizes[0].size_code : null)
-        : (selectedSizes.length > 0 ? selectedSizes[0].size_code : null),
-      size_ids: useEnhancedSelectors
-        ? enhancedSelectedSizes.map(s => s.size_code)
-        : selectedSizes.map(s => s.size_code),
-      size_name: useEnhancedSelectors
-        ? enhancedSelectedSizes.map(s => s.size_name).join(", ") || null
-        : selectedSizes.map(s => s.size_name).join(", ") || null,
+      size_id: simpleSelectedSizes.length > 0 ? simpleSelectedSizes[0].size_code : null,
+      size_ids: simpleSelectedSizes.map(s => s.size_code),
+      size_name: simpleSelectedSizes.map(s => s.size_name).join(", ") || null,
     };
 
     // Set yarn_id from yarn_ids array if not set (for backward compatibility)
@@ -968,16 +933,16 @@ export default function AddSampleRequestPage() {
                     <div className="flex items-center gap-2">
                       <Label className="text-sm font-medium">Color & Size Selectors</Label>
                       <Badge variant="outline" className="text-xs">
-                        {useEnhancedSelectors ? "Enhanced" : "Legacy"}
+                        {useSimpleSelectors ? "Simple" : "Legacy"}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="enhanced-toggle" className="text-xs">Enhanced</Label>
+                      <Label htmlFor="simple-toggle" className="text-xs">Simple</Label>
                       <input
-                        id="enhanced-toggle"
+                        id="simple-toggle"
                         type="checkbox"
-                        checked={useEnhancedSelectors}
-                        onChange={(e) => setUseEnhancedSelectors(e.target.checked)}
+                        checked={useSimpleSelectors}
+                        onChange={(e) => setUseSimpleSelectors(e.target.checked)}
                         className="rounded"
                       />
                     </div>
@@ -985,43 +950,22 @@ export default function AddSampleRequestPage() {
 
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Colors</Label>
-                    {useEnhancedSelectors ? (
-                      <EnhancedColorSelector
-                        selectedColors={enhancedSelectedColors}
-                        onColorsChange={setEnhancedSelectedColors}
-                        maxSelections={10}
-                        showTrends={true}
-                        showEquivalents={true}
-                      />
-                    ) : (
-                      <ColorSelector
-                        selectedColors={selectedColors}
-                        onColorsChange={setSelectedColors}
-                        maxSelections={10}
-                      />
-                    )}
+                    <SimpleColorSelector
+                      selectedColors={simpleSelectedColors}
+                      onColorsChange={setSimpleSelectedColors}
+                      maxSelections={10}
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Sizes</Label>
-                    {useEnhancedSelectors ? (
-                      <EnhancedSizeSelector
-                        selectedSizes={enhancedSelectedSizes}
-                        onSizesChange={setEnhancedSelectedSizes}
-                        maxSelections={20}
-                        showMeasurements={true}
-                        showRegionalVariations={true}
-                        enableSizeConversion={true}
-                      />
-                    ) : (
-                      <SizeSelector
-                        selectedSizes={selectedSizes}
-                        onSizesChange={setSelectedSizes}
-                        maxSelections={20}
-                      />
-                    )}
+                    <SimpleSizeSelector
+                      selectedSizes={simpleSelectedSizes}
+                      onSizesChange={setSimpleSelectedSizes}
+                      maxSelections={20}
+                    />
                   </div>
                 </div>
               </div>
@@ -1420,109 +1364,58 @@ export default function AddSampleRequestPage() {
                     <div><span className="text-muted-foreground">Gauge:</span> <span className="font-medium">{formatGaugeForDisplay(formData.gauge) || "Not entered"}</span></div>
                     <div><span className="text-muted-foreground">PLY:</span> <span className="font-medium">{formData.ply || "Not entered"}</span></div>
                     <div><span className="text-muted-foreground">Colors:</span> <span className="font-medium">
-                      {useEnhancedSelectors 
-                        ? `${enhancedSelectedColors.length} selected (Enhanced)` 
-                        : `${selectedColors.length} selected (Legacy)`}
+                      {simpleSelectedColors.length > 0 ? `${simpleSelectedColors.length} selected (Simple)` : "None selected"}
                     </span></div>
                   </div>
                   
-                  {/* Enhanced Color Details */}
-                  {useEnhancedSelectors && enhancedSelectedColors.length > 0 && (
+                  {/* Simple Color Details */}
+                  {simpleSelectedColors.length > 0 && (
                     <div className="mt-3 pt-3 border-t">
-                      <span className="text-xs text-muted-foreground">Selected Colors (Enhanced):</span>
+                      <span className="text-xs text-muted-foreground">Selected Colors (Simple):</span>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {enhancedSelectedColors.map((color) => (
-                          <div key={color.id} className="flex items-center gap-2 bg-background rounded px-2 py-1 border">
-                            <div
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: color.hex_code }}
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-medium">{color.color_name}</span>
-                              <div className="flex gap-1">
-                                {color.pantone_code && <Badge variant="outline" className="text-xs">Pantone: {color.pantone_code}</Badge>}
-                                {color.ral_code && <Badge variant="outline" className="text-xs">RAL: {color.ral_code}</Badge>}
-                                <Badge variant="outline" className="text-xs">{color.color_family}</Badge>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Legacy Color Details */}
-                  {!useEnhancedSelectors && selectedColors.length > 0 && (
-                    <div className="mt-3 pt-3 border-t">
-                      <span className="text-xs text-muted-foreground">Selected Colors (Legacy):</span>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {selectedColors.map((color) => (
+                        {simpleSelectedColors.map((color) => (
                           <div key={`${color.type}-${color.id}`} className="flex items-center gap-2 bg-background rounded px-2 py-1 border">
-                            <div
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: color.hex_code }}
-                            />
-                            <span className="text-xs font-medium">{color.name}</span>
-                            <Badge variant="outline" className="text-xs">{color.type === "hm" ? "H&M" : color.code}</Badge>
+                            {color.hex_code && (
+                              <div
+                                className="w-4 h-4 rounded border"
+                                style={{ backgroundColor: color.hex_code }}
+                              />
+                            )}
+                            <div className="flex flex-col">
+                              <span className="text-xs font-medium">{color.name}</span>
+                              <div className="flex gap-1">
+                                <Badge variant="outline" className="text-xs">{color.type.toUpperCase()}: {color.code}</Badge>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
                   
-                  {/* Enhanced Size Details */}
-                  {useEnhancedSelectors && (
-                    <div className="mt-3 pt-3 border-t">
-                      <span className="text-muted-foreground text-sm">Sizes (Enhanced):</span>
-                      <span className="font-medium text-sm ml-2">
-                        {enhancedSelectedSizes.length > 0 ? `${enhancedSelectedSizes.length} selected` : "None selected"}
-                      </span>
-                      {enhancedSelectedSizes.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {enhancedSelectedSizes.map((size) => (
-                            <div key={size.id} className="bg-background rounded px-2 py-1 border">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="text-xs">
-                                  {size.size_name} ({size.size_label})
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {size.garment_type_name} • {size.gender} • {size.age_group}
-                                </span>
-                              </div>
-                              {size.measurements && Object.keys(size.measurements).length > 0 && (
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  Measurements: {Object.entries(size.measurements)
-                                    .slice(0, 3)
-                                    .map(([key, value]) => `${key}: ${value}`)
-                                    .join(", ")}
-                                  {Object.keys(size.measurements).length > 3 && "..."}
-                                </div>
-                              )}
+                  {/* Simple Size Details */}
+                  <div className="mt-3 pt-3 border-t">
+                    <span className="text-muted-foreground text-sm">Sizes (Simple):</span>
+                    <span className="font-medium text-sm ml-2">
+                      {simpleSelectedSizes.length > 0 ? `${simpleSelectedSizes.length} selected` : "None selected"}
+                    </span>
+                    {simpleSelectedSizes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {simpleSelectedSizes.map((size) => (
+                          <div key={size.id} className="bg-background rounded px-2 py-1 border">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {size.size_name} ({size.size_label || size.size_code})
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {size.garment_type_name} • {size.gender} • {size.age_group}
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Legacy Size Details */}
-                  {!useEnhancedSelectors && (
-                    <div className="mt-3 pt-3 border-t">
-                      <span className="text-muted-foreground text-sm">Sizes (Legacy):</span>
-                      <span className="font-medium text-sm ml-2">
-                        {selectedSizes.length > 0 ? `${selectedSizes.length} selected` : "None selected"}
-                      </span>
-                      {selectedSizes.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedSizes.map((size) => (
-                            <Badge key={size.id} variant="secondary" className="text-xs">
-                              {size.size_name} ({size.garment_type_name}, {size.gender})
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Materials Review */}

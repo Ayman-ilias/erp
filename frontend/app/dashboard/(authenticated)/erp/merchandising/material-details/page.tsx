@@ -40,8 +40,7 @@ import { toast } from "sonner";
 import { UnitSelector } from "@/components/uom/UnitSelector";
 import { InlineConverter } from "@/components/uom/InlineConverter";
 import { UnitDisplay } from "@/components/uom/UnitDisplay";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SearchableDropdown } from "@/components/ui/searchable-dropdown";
 import { cn } from "@/lib/utils";
 
 // Helper function to generate product ID: PRODUCTNAME_CAT_0001
@@ -1649,7 +1648,7 @@ function FabricDialog({
   );
 }
 
-// ========== TRIMS DIALOG (SIMPLIFIED) ==========
+// ========== TRIMS DIALOG (ENHANCED WITH SEARCHABLE DROPDOWNS) ==========
 function TrimsDialog({
   open,
   onOpenChange,
@@ -1674,6 +1673,28 @@ function TrimsDialog({
     consumable_flag: "none" as "yes" | "no" | "none",
     remarks: "",
   });
+
+  // Predefined options for dropdowns
+  const [productNames] = useState<string[]>([
+    "Metal Button", "Plastic Button", "Shell Button", "Wooden Button",
+    "Zipper", "Invisible Zipper", "Metal Zipper", "Plastic Zipper",
+    "Thread", "Polyester Thread", "Cotton Thread", "Nylon Thread",
+    "Elastic", "Waistband Elastic", "Leg Elastic", "Arm Elastic",
+    "Velcro", "Hook and Loop", "Snap Button", "Rivet",
+    "Eyelet", "Grommet", "D-Ring", "Buckle"
+  ]);
+
+  const [categories] = useState<string[]>([
+    "Button", "Zipper", "Thread", "Elastic", "Fastener",
+    "Hardware", "Closure", "Reinforcement", "Decorative"
+  ]);
+
+  const [subCategories] = useState<string[]>([
+    "2-hole", "4-hole", "Shank", "Snap", "Toggle",
+    "Coil", "Invisible", "Metal Teeth", "Plastic Teeth",
+    "Core Spun", "Textured", "Monofilament", "Multifilament",
+    "Knitted", "Woven", "Braided", "Flat"
+  ]);
 
   // Auto-generate Product ID from product name (only for new items)
   React.useEffect(() => {
@@ -1751,44 +1772,28 @@ function TrimsDialog({
                 disabled
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="product_name">
-                Product Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="product_name"
-                value={formData.product_name}
-                onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                required
-                placeholder="e.g., Metal Button"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Button">Button</SelectItem>
-                  <SelectItem value="Zipper">Zipper</SelectItem>
-                  <SelectItem value="Thread">Thread</SelectItem>
-                  <SelectItem value="Elastic">Elastic</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sub_category">Sub-Category</Label>
-              <Input
-                id="sub_category"
-                value={formData.sub_category}
-                onChange={(e) => setFormData({ ...formData, sub_category: e.target.value })}
-                placeholder="e.g., 2-hole, 4-hole"
-              />
-            </div>
+            <SearchableDropdown
+              label="Product Name"
+              value={formData.product_name}
+              onChange={(value) => setFormData({ ...formData, product_name: value })}
+              options={productNames}
+              placeholder="Select or type product name..."
+              required
+            />
+            <SearchableDropdown
+              label="Category"
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value })}
+              options={categories}
+              placeholder="Select or type category..."
+            />
+            <SearchableDropdown
+              label="Sub-Category"
+              value={formData.sub_category}
+              onChange={(value) => setFormData({ ...formData, sub_category: value })}
+              options={subCategories}
+              placeholder="Select or type sub-category..."
+            />
             <div className="space-y-2">
               <Label htmlFor="unit_id">
                 Unit <span className="text-destructive">*</span>
@@ -1797,7 +1802,6 @@ function TrimsDialog({
                 <UnitSelector
                   value={formData.unit_id}
                   onChange={(value) => setFormData({ ...formData, unit_id: value })}
-                  categoryFilter="Quantity"
                   placeholder="Select unit"
                   className="flex-1"
                 />
@@ -1860,7 +1864,7 @@ function TrimsDialog({
   );
 }
 
-// ========== ACCESSORIES DIALOG (Same structure as Trims) ==========
+// ========== ACCESSORIES DIALOG (ENHANCED WITH SEARCHABLE DROPDOWNS) ==========
 function AccessoriesDialog({
   open,
   onOpenChange,
@@ -1886,14 +1890,25 @@ function AccessoriesDialog({
     remarks: "",
   });
   
-  // Category management with search and creation
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState("");
-  const [categories, setCategories] = useState<string[]>([
-    "Label",
-    "Tag",
-    "Hanger",
-    "Sticker",
+  // Predefined options for dropdowns
+  const [productNames] = useState<string[]>([
+    "Woven Label", "Printed Label", "Care Label", "Size Label",
+    "Hang Tag", "Price Tag", "Swing Tag", "Barcode Tag",
+    "Plastic Hanger", "Wire Hanger", "Wooden Hanger", "Clip Hanger",
+    "Sticker", "Hologram Sticker", "Security Sticker", "Brand Sticker",
+    "Poly Bag", "Paper Bag", "Gift Box", "Tissue Paper"
+  ]);
+
+  const [categories] = useState<string[]>([
+    "Label", "Tag", "Hanger", "Sticker", "Packaging",
+    "Branding", "Security", "Information", "Decoration"
+  ]);
+
+  const [subCategories] = useState<string[]>([
+    "Main Label", "Care Label", "Size Label", "Brand Label",
+    "Hang Tag", "Price Tag", "Swing Tag", "Security Tag",
+    "Plastic", "Wire", "Wood", "Clip", "Padded",
+    "Hologram", "Barcode", "QR Code", "RFID"
   ]);
 
   // Auto-generate Product ID from product name (only for new items)
@@ -1916,21 +1931,10 @@ function AccessoriesDialog({
         consumableValue = "none";
       }
       
-      // Add category to list if it doesn't exist
-      const editingCategory = editingAccessories.category || "";
-      if (editingCategory) {
-        setCategories((prev) => {
-          if (!prev.includes(editingCategory)) {
-            return [...prev, editingCategory];
-          }
-          return prev;
-        });
-      }
-      
       setFormData({
         product_id: editingAccessories.product_id || "",
         product_name: editingAccessories.product_name || "",
-        category: editingCategory,
+        category: editingAccessories.category || "",
         sub_category: editingAccessories.sub_category || "",
         unit_id: editingAccessories.unit_id || 0,
         consumable_flag: consumableValue,
@@ -1986,121 +1990,28 @@ function AccessoriesDialog({
                 disabled
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="product_name">
-                Product Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="product_name"
-                value={formData.product_name}
-                onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                required
-                placeholder="e.g., Woven Label"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={categoryOpen}
-                    className="w-full justify-between"
-                  >
-                    {formData.category || "Select category..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput
-                      placeholder="Search category or create new..."
-                      value={categorySearch}
-                      onValueChange={setCategorySearch}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        <div className="py-2 px-3">
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              if (categorySearch.trim()) {
-                                const newCategory = categorySearch.trim();
-                                setCategories((prev) => [...prev, newCategory]);
-                                setFormData({ ...formData, category: newCategory });
-                                setCategorySearch("");
-                                setCategoryOpen(false);
-                                toast.success(`Category "${newCategory}" created`);
-                              }
-                            }}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create "{categorySearch}"
-                          </Button>
-                        </div>
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {categories
-                          .filter((cat) =>
-                            cat.toLowerCase().includes(categorySearch.toLowerCase())
-                          )
-                          .map((category) => (
-                            <CommandItem
-                              key={category}
-                              value={category}
-                              onSelect={() => {
-                                setFormData({ ...formData, category });
-                                setCategoryOpen(false);
-                                setCategorySearch("");
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  formData.category === category ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {category}
-                            </CommandItem>
-                          ))}
-                      </CommandGroup>
-                      {categorySearch.trim() &&
-                        !categories.some(
-                          (cat) => cat.toLowerCase() === categorySearch.toLowerCase()
-                        ) && (
-                          <CommandGroup>
-                            <CommandItem
-                              onSelect={() => {
-                                const newCategory = categorySearch.trim();
-                                setCategories((prev) => [...prev, newCategory]);
-                                setFormData({ ...formData, category: newCategory });
-                                setCategorySearch("");
-                                setCategoryOpen(false);
-                                toast.success(`Category "${newCategory}" created`);
-                              }}
-                              className="text-primary"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Create "{categorySearch}"
-                            </CommandItem>
-                          </CommandGroup>
-                        )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sub_category">Sub-Category</Label>
-              <Input
-                id="sub_category"
-                value={formData.sub_category}
-                onChange={(e) => setFormData({ ...formData, sub_category: e.target.value })}
-                placeholder="e.g., Main Label, Care Label"
-              />
-            </div>
+            <SearchableDropdown
+              label="Product Name"
+              value={formData.product_name}
+              onChange={(value) => setFormData({ ...formData, product_name: value })}
+              options={productNames}
+              placeholder="Select or type product name..."
+              required
+            />
+            <SearchableDropdown
+              label="Category"
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value })}
+              options={categories}
+              placeholder="Select or type category..."
+            />
+            <SearchableDropdown
+              label="Sub-Category"
+              value={formData.sub_category}
+              onChange={(value) => setFormData({ ...formData, sub_category: value })}
+              options={subCategories}
+              placeholder="Select or type sub-category..."
+            />
             <div className="space-y-2">
               <Label htmlFor="unit_id">
                 Unit <span className="text-destructive">*</span>
@@ -2109,7 +2020,6 @@ function AccessoriesDialog({
                 <UnitSelector
                   value={formData.unit_id}
                   onChange={(value) => setFormData({ ...formData, unit_id: value })}
-                  categoryFilter="Quantity"
                   placeholder="Select unit"
                   className="flex-1"
                 />
@@ -2172,7 +2082,7 @@ function AccessoriesDialog({
   );
 }
 
-// ========== FINISHED GOOD DIALOG ==========
+// ========== FINISHED GOOD DIALOG (ENHANCED WITH SEARCHABLE DROPDOWNS) ==========
 function FinishedGoodDialog({
   open,
   onOpenChange,
@@ -2197,6 +2107,28 @@ function FinishedGoodDialog({
     consumable_flag: "none" as "yes" | "no" | "none",
     remarks: "",
   });
+
+  // Predefined options for dropdowns
+  const [productNames] = useState<string[]>([
+    "T-Shirt Basic", "T-Shirt Premium", "Polo Shirt", "Tank Top",
+    "Hoodie", "Sweatshirt", "Cardigan", "Blazer", "Jacket",
+    "Jeans", "Chinos", "Cargo Pants", "Dress Pants", "Leggings",
+    "Shorts", "Bermuda", "Skirt", "Dress", "Jumpsuit",
+    "Underwear", "Socks", "Cap", "Hat", "Scarf"
+  ]);
+
+  const [categories] = useState<string[]>([
+    "T-Shirt", "Polo", "Jacket", "Pants", "Shorts",
+    "Dress", "Skirt", "Underwear", "Accessories", "Outerwear",
+    "Activewear", "Sleepwear", "Formal", "Casual"
+  ]);
+
+  const [subCategories] = useState<string[]>([
+    "Round Neck", "V-Neck", "Crew Neck", "Scoop Neck",
+    "Long Sleeve", "Short Sleeve", "Sleeveless", "3/4 Sleeve",
+    "Slim Fit", "Regular Fit", "Loose Fit", "Oversized",
+    "High Waist", "Low Waist", "Mid Rise", "Bootcut", "Straight"
+  ]);
 
   // Auto-generate Product ID from product name (only for new items)
   useEffect(() => {
@@ -2276,45 +2208,28 @@ function FinishedGoodDialog({
                 disabled
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="product_name">
-                Product Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="product_name"
-                value={formData.product_name}
-                onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                required
-                placeholder="e.g., T-Shirt Basic"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="T-Shirt">T-Shirt</SelectItem>
-                  <SelectItem value="Polo">Polo</SelectItem>
-                  <SelectItem value="Jacket">Jacket</SelectItem>
-                  <SelectItem value="Pants">Pants</SelectItem>
-                  <SelectItem value="Shorts">Shorts</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sub_category">Sub-Category</Label>
-              <Input
-                id="sub_category"
-                value={formData.sub_category}
-                onChange={(e) => setFormData({ ...formData, sub_category: e.target.value })}
-                placeholder="e.g., Round Neck, V-Neck"
-              />
-            </div>
+            <SearchableDropdown
+              label="Product Name"
+              value={formData.product_name}
+              onChange={(value) => setFormData({ ...formData, product_name: value })}
+              options={productNames}
+              placeholder="Select or type product name..."
+              required
+            />
+            <SearchableDropdown
+              label="Category"
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value })}
+              options={categories}
+              placeholder="Select or type category..."
+            />
+            <SearchableDropdown
+              label="Sub-Category"
+              value={formData.sub_category}
+              onChange={(value) => setFormData({ ...formData, sub_category: value })}
+              options={subCategories}
+              placeholder="Select or type sub-category..."
+            />
             <div className="space-y-2">
               <Label htmlFor="unit_id">
                 Unit <span className="text-destructive">*</span>
@@ -2323,7 +2238,6 @@ function FinishedGoodDialog({
                 <UnitSelector
                   value={formData.unit_id}
                   onChange={(value) => setFormData({ ...formData, unit_id: value })}
-                  categoryFilter="Quantity"
                   placeholder="Select unit"
                   className="flex-1"
                 />
@@ -2386,7 +2300,7 @@ function FinishedGoodDialog({
   );
 }
 
-// ========== PACKING GOOD DIALOG ==========
+// ========== PACKING GOOD DIALOG (ENHANCED WITH SEARCHABLE DROPDOWNS) ==========
 function PackingGoodDialog({
   open,
   onOpenChange,
@@ -2415,6 +2329,28 @@ function PackingGoodDialog({
     carton_weight: "",
     remarks: "",
   });
+
+  // Predefined options for dropdowns
+  const [productNames] = useState<string[]>([
+    "Carton Box", "Master Carton", "Inner Box", "Display Box",
+    "Poly Bag", "Zip Lock Bag", "Bubble Wrap", "Foam Sheet",
+    "Tissue Paper", "Wrapping Paper", "Gift Paper", "Kraft Paper",
+    "Sticker Label", "Shipping Label", "Barcode Label", "Warning Label",
+    "Tape", "Packing Tape", "Double Sided Tape", "Masking Tape",
+    "Bubble Mailer", "Padded Envelope", "Document Pouch"
+  ]);
+
+  const [categories] = useState<string[]>([
+    "Carton", "Poly Bag", "Sticker", "Tissue Paper", "Tape",
+    "Protective", "Envelope", "Label", "Wrapping", "Padding"
+  ]);
+
+  const [subCategories] = useState<string[]>([
+    "5-ply", "3-ply", "7-ply", "Single Wall", "Double Wall",
+    "LDPE", "HDPE", "Biodegradable", "Recyclable", "Anti-Static",
+    "Self Adhesive", "Removable", "Permanent", "Waterproof",
+    "Clear", "Colored", "Printed", "Plain", "Perforated"
+  ]);
 
   // Auto-generate Product ID from product name (only for new items)
   useEffect(() => {
@@ -2502,44 +2438,28 @@ function PackingGoodDialog({
                 disabled
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="product_name">
-                Product Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="product_name"
-                value={formData.product_name}
-                onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                required
-                placeholder="e.g., Carton Box"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Carton">Carton</SelectItem>
-                  <SelectItem value="Poly Bag">Poly Bag</SelectItem>
-                  <SelectItem value="Sticker">Sticker</SelectItem>
-                  <SelectItem value="Tissue Paper">Tissue Paper</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sub_category">Sub-Category</Label>
-              <Input
-                id="sub_category"
-                value={formData.sub_category}
-                onChange={(e) => setFormData({ ...formData, sub_category: e.target.value })}
-                placeholder="e.g., 5-ply, 3-ply"
-              />
-            </div>
+            <SearchableDropdown
+              label="Product Name"
+              value={formData.product_name}
+              onChange={(value) => setFormData({ ...formData, product_name: value })}
+              options={productNames}
+              placeholder="Select or type product name..."
+              required
+            />
+            <SearchableDropdown
+              label="Category"
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value })}
+              options={categories}
+              placeholder="Select or type category..."
+            />
+            <SearchableDropdown
+              label="Sub-Category"
+              value={formData.sub_category}
+              onChange={(value) => setFormData({ ...formData, sub_category: value })}
+              options={subCategories}
+              placeholder="Select or type sub-category..."
+            />
             <div className="space-y-2">
               <Label htmlFor="unit_id">
                 Unit <span className="text-destructive">*</span>
@@ -2548,7 +2468,6 @@ function PackingGoodDialog({
                 <UnitSelector
                   value={formData.unit_id}
                   onChange={(value) => setFormData({ ...formData, unit_id: value })}
-                  categoryFilter="Quantity"
                   placeholder="Select unit"
                   className="flex-1"
                 />

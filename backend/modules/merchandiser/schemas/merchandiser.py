@@ -115,7 +115,7 @@ class TrimsDetailBase(BaseModel):
     product_name: str = Field(..., description="Product Name")
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: str = Field(default="piece", description="Unit of Measure")
+    unit_id: int = Field(default=1, description="Unit ID (reference to units system)")
     consumable_flag: bool = Field(default=True, description="Is Consumable")
     remarks: Optional[str] = None
 
@@ -128,7 +128,7 @@ class TrimsDetailUpdate(BaseModel):
     product_name: Optional[str] = None
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: Optional[str] = None
+    unit_id: Optional[int] = None
     consumable_flag: Optional[bool] = None
     remarks: Optional[str] = None
 
@@ -148,7 +148,7 @@ class AccessoriesDetailBase(BaseModel):
     product_name: str = Field(..., description="Product Name")
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: str = Field(default="piece", description="Unit of Measure")
+    unit_id: int = Field(default=1, description="Unit ID (reference to units system)")
     consumable_flag: bool = Field(default=True, description="Is Consumable")
     remarks: Optional[str] = None
 
@@ -161,7 +161,7 @@ class AccessoriesDetailUpdate(BaseModel):
     product_name: Optional[str] = None
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: Optional[str] = None
+    unit_id: Optional[int] = None
     consumable_flag: Optional[bool] = None
     remarks: Optional[str] = None
 
@@ -181,7 +181,7 @@ class FinishedGoodDetailBase(BaseModel):
     product_name: str = Field(..., description="Product Name")
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: str = Field(default="piece", description="Unit of Measure")
+    unit_id: int = Field(default=1, description="Unit ID (reference to units system)")
     consumable_flag: bool = Field(default=True, description="Is Consumable")
     remarks: Optional[str] = None
 
@@ -194,7 +194,7 @@ class FinishedGoodDetailUpdate(BaseModel):
     product_name: Optional[str] = None
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: Optional[str] = None
+    unit_id: Optional[int] = None
     consumable_flag: Optional[bool] = None
     remarks: Optional[str] = None
 
@@ -214,7 +214,7 @@ class PackingGoodDetailBase(BaseModel):
     product_name: str = Field(..., description="Product Name")
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: str = Field(default="piece", description="Unit of Measure")
+    unit_id: int = Field(default=1, description="Unit ID (reference to units system)")
     consumable_flag: bool = Field(default=True, description="Is Consumable")
     carton_length: Optional[float] = Field(None, description="Carton length in cm")
     carton_width: Optional[float] = Field(None, description="Carton width in cm")
@@ -231,7 +231,7 @@ class PackingGoodDetailUpdate(BaseModel):
     product_name: Optional[str] = None
     category: Optional[str] = None
     sub_category: Optional[str] = None
-    uom: Optional[str] = None
+    unit_id: Optional[int] = None
     consumable_flag: Optional[bool] = None
     carton_length: Optional[float] = None
     carton_width: Optional[float] = None
