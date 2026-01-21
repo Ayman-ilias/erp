@@ -323,7 +323,14 @@ def run_all_migrations():
         except ImportError:
             logger.warning("create_unit_change_audit_table migration not found, skipping")
         
-        # Phase 10: Performance optimizations
+        # Phase 10: Merchandiser UOM integration
+        try:
+            from migrations.add_uom_to_merchandiser_tables import run_migration as add_merchandiser_uom
+            tracker.run_migration("add_uom_to_merchandiser_tables", add_merchandiser_uom)
+        except ImportError:
+            logger.warning("add_uom_to_merchandiser_tables migration not found, skipping")
+        
+        # Phase 11: Performance optimizations
         from migrations.add_performance_indexes import add_performance_indexes
         tracker.run_migration("add_performance_indexes", add_performance_indexes)
         
