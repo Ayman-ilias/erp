@@ -182,8 +182,8 @@ class UniversalColorResponse(UniversalColorBase):
     id: int
     color_code: str
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -200,7 +200,7 @@ class UniversalColorListResponse(BaseModel):
     pantone_code: Optional[str] = None
     tcx_code: Optional[str] = None
     is_active: bool
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

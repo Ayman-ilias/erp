@@ -33,7 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   PlusCircle, Edit, Trash2, Shield, Search, Palette, SwatchBook,
-  Info, Tag, Building2, Globe
+  Info, Tag, Building2, Globe, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +129,7 @@ const finishTypeOptions: { value: FinishTypeEnum; label: string }[] = [
 export default function ColorMasterPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("universal");
+  const [hasVisitedHMTab, setHasVisitedHMTab] = useState(false);
 
   // Universal Colors State
   const [universalSearchTerm, setUniversalSearchTerm] = useState("");
@@ -143,6 +144,8 @@ export default function ColorMasterPage() {
   const [hmColorValueFilter, setHMColorValueFilter] = useState<string>("all");
   const [isHMDialogOpen, setIsHMDialogOpen] = useState(false);
   const [editingHM, setEditingHM] = useState<HMColor | null>(null);
+  const [hmPage, setHMPage] = useState(1);
+  const hmPageSize = 50; // Items per page
 
   // Universal Color Form
   const [universalFormData, setUniversalFormData] = useState({
@@ -170,12 +173,17 @@ export default function ColorMasterPage() {
   // Queries
   const { data: universalColors = [], isLoading: universalLoading } = useUniversalColors(
     universalFamilyFilter !== "all" ? universalFamilyFilter : undefined,
-    universalTypeFilter !== "all" ? universalTypeFilter : undefined
+    universalTypeFilter !== "all" ? universalTypeFilter : undefined,
+    0,  // skip
+    500 // limit - fetch all universal colors
   );
 
   const { data: hmColors = [], isLoading: hmLoading } = useHMColors(
     hmColorMasterFilter !== "all" ? hmColorMasterFilter : undefined,
-    hmColorValueFilter !== "all" ? hmColorValueFilter : undefined
+    hmColorValueFilter !== "all" ? hmColorValueFilter : undefined,
+    0,    // skip
+    5000, // limit - fetch all H&M colors (3860+ records)
+    hasVisitedHMTab || activeTab === "hm" // Only load when tab is visited
   );
 
   // Mutations
@@ -220,6 +228,26 @@ export default function ColorMasterPage() {
     return filtered;
   }, [hmColors, hmSearchTerm]);
 
+  // Paginate H&M colors for performance
+  const paginatedHMColors = useMemo(() => {
+    const startIndex = (hmPage - 1) * hmPageSize;
+    return filteredHMColors.slice(startIndex, startIndex + hmPageSize);
+  }, [filteredHMColors, hmPage, hmPageSize]);
+
+  const hmTotalPages = Math.ceil(filteredHMColors.length / hmPageSize);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setHMPage(1);
+  }, [hmSearchTerm, hmColorMasterFilter, hmColorValueFilter]);
+
+  // Track when H&M tab is visited for lazy loading
+  React.useEffect(() => {
+    if (activeTab === "hm" && !hasVisitedHMTab) {
+      setHasVisitedHMTab(true);
+    }
+  }, [activeTab, hasVisitedHMTab]);
+
   // Calculate RGB from hex
   const hexToRgb = (hex: string) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -228,6 +256,156 @@ export default function ColorMasterPage() {
       g: parseInt(result[2], 16),
       b: parseInt(result[3], 16)
     } : { r: 0, g: 0, b: 0 };
+  };
+
+  // Convert hex to HSL for color detection
+  const hexToHsl = (hex: string): { h: number; s: number; l: number } => {
+    const rgb = hexToRgb(hex);
+    const r = rgb.r / 255;
+    const g = rgb.g / 255;
+    const b = rgb.b / 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
+
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
+      }
+    }
+
+    return { h: h * 360, s: s * 100, l: l * 100 };
+  };
+
+  // Detect color family from hex code
+  const detectColorFamily = (hex: string): ColorFamilyEnum | "" => {
+    const { h, s, l } = hexToHsl(hex);
+
+    // Handle achromatic colors (very low saturation)
+    if (s < 10) {
+      if (l < 15) return "Black";
+      if (l > 90) return "White";
+      return "Grey";
+    }
+
+    // Handle very light colors
+    if (l > 90) return "White";
+    if (l < 10) return "Black";
+
+    // Detect by hue ranges
+    if (h >= 0 && h < 15) return "Red";
+    if (h >= 15 && h < 45) return "Orange";
+    if (h >= 45 && h < 70) return "Yellow";
+    if (h >= 70 && h < 160) return "Green";
+    if (h >= 160 && h < 200) return "Teal";
+    if (h >= 200 && h < 250) return "Blue";
+    if (h >= 250 && h < 290) return "Purple";
+    if (h >= 290 && h < 330) return "Pink";
+    if (h >= 330 && h <= 360) return "Red";
+
+    // Special cases based on saturation and lightness
+    if (s < 30 && l > 70 && l < 90) return "Beige";
+    if (s < 30 && l > 85) return "Cream";
+
+    return "";
+  };
+
+  // Detect color value (light/dark/bright) from hex code
+  const detectColorValue = (hex: string): ColorValueEnum | "" => {
+    const { s, l } = hexToHsl(hex);
+
+    if (l > 75) return "Light";
+    if (l < 25) return "Dark";
+    if (s > 80 && l > 40 && l < 60) return "Bright";
+    if (s > 90 && l > 55) return "Neon";
+    if (s < 40 && l > 60 && l < 80) return "Pastel";
+    if (s < 50 && l > 40 && l < 70) return "Dusty";
+    if (s > 40 && l > 35 && l < 55) return "Medium";
+    if (s < 60 && l > 30 && l < 50) return "Muted";
+
+    return "Medium";
+  };
+
+  // Auto-fill from hex code
+  const handleHexCodeChange = (newHex: string) => {
+    const updates: Partial<typeof universalFormData> = { hex_code: newHex };
+
+    // Only auto-detect if hex is valid
+    if (/^#[0-9A-Fa-f]{6}$/.test(newHex)) {
+      // Auto-detect color family if not already set
+      if (!universalFormData.color_family) {
+        const detectedFamily = detectColorFamily(newHex);
+        if (detectedFamily) updates.color_family = detectedFamily;
+      }
+      // Auto-detect color value if not already set
+      if (!universalFormData.color_value) {
+        const detectedValue = detectColorValue(newHex);
+        if (detectedValue) updates.color_value = detectedValue;
+      }
+    }
+
+    setUniversalFormData({ ...universalFormData, ...updates });
+  };
+
+  // Auto-fill from Pantone code lookup
+  const handlePantoneCodeChange = (pantoneCode: string) => {
+    setUniversalFormData({ ...universalFormData, pantone_code: pantoneCode });
+
+    // Search existing universal colors for matching Pantone code
+    if (pantoneCode.length >= 3) {
+      const matchingColor = (universalColors as UniversalColor[]).find(
+        (c) => c.pantone_code?.toLowerCase() === pantoneCode.toLowerCase()
+      );
+
+      if (matchingColor) {
+        setUniversalFormData((prev) => ({
+          ...prev,
+          pantone_code: pantoneCode,
+          name: prev.name || matchingColor.color_name,
+          hex_code: matchingColor.hex_code || prev.hex_code,
+          tcx_code: matchingColor.tcx_code || prev.tcx_code,
+          color_family: prev.color_family || matchingColor.color_family || "",
+          color_type: matchingColor.color_type || prev.color_type,
+          color_value: prev.color_value || matchingColor.color_value || "",
+          description: prev.description || matchingColor.description || "",
+        }));
+        toast.success(`Found matching Pantone color: ${matchingColor.color_name}`);
+      }
+    }
+  };
+
+  // Auto-fill from TCX code lookup
+  const handleTCXCodeChange = (tcxCode: string) => {
+    setUniversalFormData({ ...universalFormData, tcx_code: tcxCode });
+
+    // Search existing universal colors for matching TCX code
+    if (tcxCode.length >= 3) {
+      const matchingColor = (universalColors as UniversalColor[]).find(
+        (c) => c.tcx_code?.toLowerCase() === tcxCode.toLowerCase()
+      );
+
+      if (matchingColor) {
+        setUniversalFormData((prev) => ({
+          ...prev,
+          tcx_code: tcxCode,
+          name: prev.name || matchingColor.color_name,
+          hex_code: matchingColor.hex_code || prev.hex_code,
+          pantone_code: matchingColor.pantone_code || prev.pantone_code,
+          color_family: prev.color_family || matchingColor.color_family || "",
+          color_type: matchingColor.color_type || prev.color_type,
+          color_value: prev.color_value || matchingColor.color_value || "",
+          description: prev.description || matchingColor.description || "",
+        }));
+        toast.success(`Found matching TCX color: ${matchingColor.color_name}`);
+      }
+    }
   };
 
   // Universal Color handlers
@@ -624,22 +802,18 @@ export default function ColorMasterPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="hex_code">Hex Code *</Label>
+                        <Label htmlFor="hex_code">Hex Code * (auto-detects family & value)</Label>
                         <div className="flex gap-2">
                           <Input
                             type="color"
                             value={universalFormData.hex_code}
-                            onChange={(e) =>
-                              setUniversalFormData({ ...universalFormData, hex_code: e.target.value })
-                            }
+                            onChange={(e) => handleHexCodeChange(e.target.value)}
                             className="w-12 h-9 p-1 cursor-pointer"
                           />
                           <Input
                             id="hex_code"
                             value={universalFormData.hex_code}
-                            onChange={(e) =>
-                              setUniversalFormData({ ...universalFormData, hex_code: e.target.value })
-                            }
+                            onChange={(e) => handleHexCodeChange(e.target.value)}
                             placeholder="#000000"
                             pattern="^#[0-9A-Fa-f]{6}$"
                             required
@@ -659,24 +833,20 @@ export default function ColorMasterPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="pantone_code">Pantone Code</Label>
+                        <Label htmlFor="pantone_code">Pantone Code (auto-fills from database)</Label>
                         <Input
                           id="pantone_code"
                           value={universalFormData.pantone_code}
-                          onChange={(e) =>
-                            setUniversalFormData({ ...universalFormData, pantone_code: e.target.value })
-                          }
+                          onChange={(e) => handlePantoneCodeChange(e.target.value)}
                           placeholder="e.g., 19-3921"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="tcx_code">TCX Code</Label>
+                        <Label htmlFor="tcx_code">TCX Code (auto-fills from database)</Label>
                         <Input
                           id="tcx_code"
                           value={universalFormData.tcx_code}
-                          onChange={(e) =>
-                            setUniversalFormData({ ...universalFormData, tcx_code: e.target.value })
-                          }
+                          onChange={(e) => handleTCXCodeChange(e.target.value)}
                           placeholder="e.g., 13-0552 TCX"
                         />
                       </div>
@@ -684,7 +854,7 @@ export default function ColorMasterPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="color_family">Color Family</Label>
+                        <Label htmlFor="color_family">Color Family (auto from hex)</Label>
                         <Select
                           value={universalFormData.color_family}
                           onValueChange={(v: ColorFamilyEnum) =>
@@ -692,7 +862,7 @@ export default function ColorMasterPage() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select family" />
+                            <SelectValue placeholder="Auto-detected or select" />
                           </SelectTrigger>
                           <SelectContent>
                             {colorFamilyOptions.map((opt) => (
@@ -733,7 +903,7 @@ export default function ColorMasterPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="color_value">Color Value</Label>
+                        <Label htmlFor="color_value">Color Value (auto from hex)</Label>
                         <Select
                           value={universalFormData.color_value}
                           onValueChange={(v: ColorValueEnum) =>
@@ -741,7 +911,7 @@ export default function ColorMasterPage() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select value" />
+                            <SelectValue placeholder="Auto-detected or select" />
                           </SelectTrigger>
                           <SelectContent>
                             {colorValueOptions.map((opt) => (
@@ -1051,7 +1221,7 @@ export default function ColorMasterPage() {
           </div>
 
           <div className="text-sm text-muted-foreground">
-            Showing {filteredHMColors.length} of {(hmColors as HMColor[]).length} H&M colors
+            Showing {paginatedHMColors.length} of {filteredHMColors.length} filtered ({(hmColors as HMColor[]).length} total H&M colors)
           </div>
 
           <div className="rounded-md border">
@@ -1082,7 +1252,7 @@ export default function ColorMasterPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredHMColors.map((color) => (
+                  paginatedHMColors.map((color) => (
                     <TableRow key={color.id}>
                       <TableCell>
                         <code className="px-2 py-1 bg-muted rounded text-sm font-mono font-bold">
@@ -1119,6 +1289,75 @@ export default function ColorMasterPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredHMColors.length > hmPageSize && (
+            <div className="flex items-center justify-between px-2">
+              <div className="text-sm text-muted-foreground">
+                Page {hmPage} of {hmTotalPages} ({filteredHMColors.length} total)
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHMPage(1)}
+                  disabled={hmPage === 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHMPage((p) => Math.max(1, p - 1))}
+                  disabled={hmPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-1 mx-2">
+                  {/* Show page numbers */}
+                  {Array.from({ length: Math.min(5, hmTotalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (hmTotalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (hmPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (hmPage >= hmTotalPages - 2) {
+                      pageNum = hmTotalPages - 4 + i;
+                    } else {
+                      pageNum = hmPage - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={hmPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setHMPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHMPage((p) => Math.min(hmTotalPages, p + 1))}
+                  disabled={hmPage === hmTotalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHMPage(hmTotalPages)}
+                  disabled={hmPage === hmTotalPages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* H&M Color Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

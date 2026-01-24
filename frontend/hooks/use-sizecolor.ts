@@ -351,20 +351,20 @@ export function useDeleteUniversalColor() {
 // H&M COLOR HOOKS
 // ============================================================================
 
-export function useHMColors(colorMaster?: string, colorValue?: string, skip?: number, limit?: number) {
+export function useHMColors(colorMaster?: string, colorValue?: string, skip?: number, limit?: number, enabled: boolean = true) {
   const { token } = useAuth();
   return useQuery({
     queryKey: ["sizecolor", "hm-colors", colorMaster, colorValue, skip, limit],
     queryFn: async () => {
       const data = await sizeColorService.hmColors.getAll(token!, colorMaster, colorValue, skip, limit);
       // Filter out UNDEFINED records on the frontend side
-      return data.filter((color: any) => 
-        color.color_master !== "UNDEFINED" && 
-        color.color_master !== null && 
+      return data.filter((color: any) =>
+        color.color_master !== "UNDEFINED" &&
+        color.color_master !== null &&
         color.color_master !== undefined
       );
     },
-    enabled: !!token,
+    enabled: !!token && enabled,
     staleTime: 5 * 60 * 1000,
   });
 }

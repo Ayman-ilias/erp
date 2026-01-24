@@ -89,7 +89,7 @@ def list_universal_colors(
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(500, ge=1, le=1000),
     db: Session = Depends(get_db_sizecolor)
 ):
     """List all universal colors with filtering"""
@@ -269,7 +269,7 @@ def list_hm_colors(
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(5000, ge=1, le=10000),
     include_undefined: bool = Query(False, description="Include UNDEFINED records"),
     db: Session = Depends(get_db_sizecolor)
 ):
