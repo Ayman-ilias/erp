@@ -18,5 +18,21 @@ class User(Base):
     # Department access permissions - JSON array of allowed departments
     # e.g., ["client_info", "sample_department"] or ["client_info"] or ["sample_department"]
     department_access = Column(JSON, nullable=True, default=list)  # List of accessible departments
+
+    # Page-level permissions with read/write access
+    # Structure: {
+    #   "department_id": {
+    #     "page_key": {"read": true, "write": false},
+    #     ...
+    #   }
+    # }
+    # Example: {
+    #   "merchandising": {
+    #     "material_details": {"read": true, "write": true},
+    #     "sample_development": {"read": true, "write": false}
+    #   }
+    # }
+    page_permissions = Column(JSON, nullable=True, default=dict)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

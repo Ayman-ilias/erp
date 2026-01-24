@@ -149,7 +149,7 @@ from modules.auth import auth_router
 from modules.clients import buyers_router, suppliers_router, contacts_router, shipping_router, banking_router
 from modules.samples import samples_router, colors_router, size_charts_router
 from modules.operations import operations_router
-from modules.orders import orders_router
+# from modules.orders import orders_router  # REMOVED - Order management moved to merchandiser
 from modules.materials import materials_router
 from modules.users import users_router
 from modules.health import health_router
@@ -173,7 +173,7 @@ app.include_router(samples_router, prefix=f"{settings.API_V1_STR}/samples", tags
 app.include_router(colors_router, prefix=f"{settings.API_V1_STR}/color-master", tags=["color-master"])
 app.include_router(size_charts_router, prefix=f"{settings.API_V1_STR}/size-charts", tags=["size-charts"])
 app.include_router(operations_router, prefix=f"{settings.API_V1_STR}/operations", tags=["operations"])
-app.include_router(orders_router, prefix=f"{settings.API_V1_STR}/orders", tags=["orders"])
+# app.include_router(orders_router, prefix=f"{settings.API_V1_STR}/orders", tags=["orders"])  # REMOVED
 app.include_router(materials_router, prefix=f"{settings.API_V1_STR}", tags=["materials"])
 app.include_router(users_router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 app.include_router(health_router, prefix=f"{settings.API_V1_STR}", tags=["health"])

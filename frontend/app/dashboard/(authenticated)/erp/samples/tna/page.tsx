@@ -17,10 +17,24 @@ import { PlusCircle, Edit, Trash2, Search, X, Check, ChevronsUpDown } from "luci
 import { samplesService } from "@/services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { UnderDevelopment } from "@/components/under-development";
 
 const TNA_STATUSES = ["Pending", "In Progress", "Completed", "Delayed", "On Hold"];
 
 export default function SampleTNAPage() {
+  // Show Under Development overlay - wrapper with relative positioning
+  return (
+    <div className="relative min-h-[calc(100vh-120px)]">
+      <UnderDevelopment
+        title="Sample TNA"
+        message="The Time and Action (TNA) tracking feature is currently under development and will be available soon."
+      />
+      <SampleTNAContent />
+    </div>
+  );
+}
+
+function SampleTNAContent() {
   const [tnaRecords, setTnaRecords] = useState<any[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
   const [sampleRequests, setSampleRequests] = useState<any[]>([]);

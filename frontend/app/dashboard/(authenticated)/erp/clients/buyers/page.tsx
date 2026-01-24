@@ -23,7 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Edit, Trash2, Search, X, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, X, Loader2, Eye } from "lucide-react";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ExportButton } from "@/components/export-button";
 import type { ExportColumn } from "@/lib/export-utils";
 import { BuyerTypeSelector } from "@/components/clients/buyer-type-selector";
@@ -82,6 +84,11 @@ const initialFormData: BuyerFormData = {
 };
 
 export default function BuyersPage() {
+  // ============================================================================
+  // PAGE PERMISSIONS: Check read/write access for this page
+  // ============================================================================
+  const { canWrite, canRead } = usePagePermissions();
+
   // ============================================================================
   // TANSTACK QUERY: Data fetching with caching, auto-refetch, loading states
   // Benefits: No useEffect needed, automatic cache invalidation, loading/error states
@@ -319,6 +326,15 @@ export default function BuyersPage() {
   return (
     <PermissionGuard requiredDepartment="client_info">
       <div className="space-y-6">
+      {/* Read-only mode banner */}
+      {!canWrite && canRead && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+          <Eye className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400">
+            You have <strong>read-only</strong> access to this page. Contact your administrator for edit permissions.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Buyer Info</h1>
@@ -336,7 +352,10 @@ export default function BuyersPage() {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button
+              disabled={!canWrite}
+              title={!canWrite ? "You don't have write permission" : undefined}
+            >
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Buyer
             </Button>
@@ -646,10 +665,22 @@ export default function BuyersPage() {
                   <TableCell className="text-sm text-muted-foreground">{buyer.updated_at ? formatDate(buyer.updated_at) : "-"}</TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(buyer)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(buyer)}
+                        disabled={!canWrite}
+                        title={!canWrite ? "You don't have write permission" : undefined}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(buyer.id)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(buyer.id)}
+                        disabled={!canWrite}
+                        title={!canWrite ? "You don't have write permission" : undefined}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>

@@ -337,7 +337,28 @@ def run_all_migrations():
         # Phase 12: Comprehensive color data import
         from migrations.import_comprehensive_colors import run_migration as import_comprehensive_colors
         tracker.run_migration("import_comprehensive_colors", import_comprehensive_colors)
-        
+
+        # Phase 13: Order Management System
+        try:
+            from migrations.create_order_management_tables import run_migration as create_order_management
+            tracker.run_migration("create_order_management_tables", create_order_management)
+        except ImportError:
+            logger.warning("create_order_management_tables migration not found, skipping")
+
+        # Phase 14: Add yarn_composition_details and cuttable_width columns
+        try:
+            from migrations.add_yarn_fabric_columns import run_migration as add_yarn_fabric_columns
+            tracker.run_migration("add_yarn_fabric_columns", add_yarn_fabric_columns)
+        except ImportError:
+            logger.warning("add_yarn_fabric_columns migration not found, skipping")
+
+        # Phase 15: Add page_permissions to users for page-level access control
+        try:
+            from migrations.add_page_permissions_to_users import run_migration as add_page_permissions
+            tracker.run_migration("add_page_permissions_to_users", add_page_permissions)
+        except ImportError:
+            logger.warning("add_page_permissions_to_users migration not found, skipping")
+
         logger.info("=" * 80)
         logger.info("MIGRATION SEQUENCE COMPLETED")
         logger.info("=" * 80)

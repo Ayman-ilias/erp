@@ -45,6 +45,9 @@ from modules.samples.schemas.sample import (
 )
 from modules.materials.services.validation_service import ValidationService, ValidationError, DatabaseConnectionError
 from modules.samples.services.sample_material_service import SampleMaterialService, SampleMaterialServiceError
+from modules.samples.services.yarn_management_service import YarnManagementService, YarnManagementServiceError
+from modules.merchandiser.schemas.merchandiser import YarnDetailCreate, YarnCompositionDetail
+from core.database import get_db_merchandiser
 import uuid
 from datetime import datetime
 
@@ -1812,3 +1815,108 @@ def get_sample(sample_id: int, db: Session = Depends(get_db_samples)):
     if not sample:
         raise HTTPException(status_code=404, detail="Sample not found")
     return sample
+
+# =============================================================================
+# YARN MANAGEMENT FOR SAMPLE DEVELOPMENT
+# =============================================================================
+
+@router.post("/yarn-management/create-yarn", response_model=dict, status_code=status.HTTP_201_CREATED)
+def create_yarn_from_sample(
+    yarn_data: YarnDetailCreate,
+    sample_id: str,
+    db_samples: Session = Depends(get_db_samples),
+    db_merchandiser: Session = Depends(get_db_merchandiser)
+):
+    """Create a new yarn from sample development form"""
+    try:
+        yarn_dict = yarn_data.model_dump()
+        
+        # Create yarn using the service
+        yarn_detail = YarnManagementService.create_yarn_from_sample(
+            yarn_dict, sample_id, db_merchandiser, db_samples
+        )
+        
+        return {
+            "success": True,
+            "message": "Yarn created successfully",
+            "yarn_id": yarn_detail.yarn_id,
+            "yarn_name": yarn_detail.yarn_name,
+            "sample_id": sample_id
+        }
+        
+    except YarnManagementServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Yarn creation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create yarn"
+        )
+
+
+@router.get("/yarn-management/sample-yarns/{sample_id}", response_model=List[dict])
+def get_yarns_for_sample(
+    sample_id: str,
+    db_samples: Session = Depends(get_db_samples),
+    db_merchandiser: Session = Depends(get_db_merchandiser)
+):
+    """Get all yarns associated with a sample"""
+    try:
+        yarns = YarnManagementService.get_yarns_for_sample(
+            sample_id, db_samples, db_merchandiser
+        )
+        return yarns
+        
+    except Exception as e:
+        logger.error(f"Failed to get yarns for sample {sample_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve yarns"
+        )
+
+
+@router.post("/yarn-management/validate-composition", response_model=dict)
+def validate_yarn_composition(composition_details: List[YarnCompositionDetail]):
+    """Validate yarn composition details"""
+    try:
+        composition_list = [item.model_dump() for item in composition_details]
+        is_valid = YarnManagementService.validate_yarn_composition(composition_list)
+        
+        total_percentage = sum(item.percentage for item in composition_details)
+        
+        return {
+            "valid": is_valid,
+            "total_percentage": total_percentage,
+            "message": "Valid composition" if is_valid else f"Invalid composition: total is {total_percentage}%, must be 100%"
+        }
+        
+    except Exception as e:
+        logger.error(f"Composition validation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid composition data"
+        )
+
+
+# @router.get("/yarn-management/generate-yarn-id/{yarn_name}", response_model=dict)
+# def generate_yarn_id_preview(
+#     yarn_name: str,
+#     db_merchandiser: Session = Depends(get_db_merchandiser)
+# ):
+#     """Generate a preview of yarn ID for given yarn name"""
+#     try:
+#         yarn_id = YarnManagementService.generate_yarn_id(yarn_name, db_merchandiser)
+#         return {
+#             "yarn_name": yarn_name,
+#             "suggested_yarn_id": yarn_id
+#         }
+        
+#     except Exception as e:
+#         logger.error(f"Yarn ID generation failed: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Failed to generate yarn ID"
+#         )

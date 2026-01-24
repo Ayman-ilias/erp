@@ -34,7 +34,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, ArrowLeft, Loader2, Edit, Trash2, Calendar, CheckCircle2, ChevronsUpDown, Check, Upload, FileText, RefreshCw } from "lucide-react";
+import { Plus, ArrowLeft, Loader2, Edit, Trash2, Calendar, CheckCircle2, ChevronsUpDown, Check, Upload, FileText, RefreshCw, Eye } from "lucide-react";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { toast } from "sonner";
@@ -46,6 +48,9 @@ export default function SampleDevelopmentPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("primary");
+
+  // Page permissions for read/write access
+  const { canWrite, canRead } = usePagePermissions();
 
   // Dialog states
   const [primaryDialogOpen, setPrimaryDialogOpen] = useState(false);
@@ -254,6 +259,15 @@ export default function SampleDevelopmentPage() {
 
   return (
     <div className="space-y-6">
+      {/* Read-only mode banner */}
+      {!canWrite && canRead && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+          <Eye className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400">
+            You have <strong>read-only</strong> access to this page. Contact your administrator for edit permissions.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <Button
@@ -273,6 +287,8 @@ export default function SampleDevelopmentPage() {
           onClick={() => {
             window.open("/dashboard/erp/merchandising/sample-development/add-request", "_blank");
           }}
+          disabled={!canWrite}
+          title={!canWrite ? "You don't have write permission" : undefined}
         >
           <Plus className="mr-2 h-4 w-4" />
           Create New Sample Request
@@ -322,6 +338,8 @@ export default function SampleDevelopmentPage() {
                   onClick={() => {
                     window.open("/dashboard/erp/merchandising/sample-development/add-request", "_blank");
                   }}
+                  disabled={!canWrite}
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Sample Request
@@ -370,6 +388,8 @@ export default function SampleDevelopmentPage() {
                             onClick={() => {
                               window.open(`/dashboard/erp/merchandising/sample-development/add-request?edit=${sample.sample_id}`, "_blank");
                             }}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -377,6 +397,8 @@ export default function SampleDevelopmentPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeletePrimary(sample.sample_id)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -410,6 +432,8 @@ export default function SampleDevelopmentPage() {
                     setEditingTna(null);
                     setTnaDialogOpen(true);
                   }}
+                  disabled={!canWrite}
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add TNA
@@ -461,6 +485,8 @@ export default function SampleDevelopmentPage() {
                               setEditingTna(tna);
                               setTnaDialogOpen(true);
                             }}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -468,6 +494,8 @@ export default function SampleDevelopmentPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteTna(tna.id)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -498,8 +526,9 @@ export default function SampleDevelopmentPage() {
                 </div>
                 <Button
                   onClick={() => syncStatusMutation.mutate()}
-                  disabled={syncStatusMutation.isPending}
+                  disabled={syncStatusMutation.isPending || !canWrite}
                   variant="outline"
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   {syncStatusMutation.isPending ? (
                     <>
@@ -579,6 +608,8 @@ export default function SampleDevelopmentPage() {
                                 toast.error("Failed to open edit dialog");
                               }
                             }}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -586,6 +617,8 @@ export default function SampleDevelopmentPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteStatus(status.id)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>

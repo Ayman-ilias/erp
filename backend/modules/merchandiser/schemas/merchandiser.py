@@ -12,10 +12,16 @@ from datetime import datetime
 # ============================================================================
 
 # --- YARN SCHEMAS ---
+class YarnCompositionDetail(BaseModel):
+    """Yarn composition detail for popup UI"""
+    material: str = Field(..., description="Material name (e.g., BCI COTTON, RECYCLED, POLYAMIDE)")
+    percentage: float = Field(..., ge=0, le=100, description="Percentage (0-100)")
+
 class YarnDetailBase(BaseModel):
-    yarn_id: str = Field(..., description="Unique Yarn ID")
+    yarn_id: Optional[str] = Field(None, description="Unique Yarn ID (auto-generated if not provided)")
     yarn_name: str = Field(..., description="Yarn Name")
     yarn_composition: Optional[str] = None
+    yarn_composition_details: Optional[List[YarnCompositionDetail]] = Field(None, description="Detailed composition breakdown")
     blend_ratio: Optional[str] = None
     yarn_count: Optional[str] = None
     count_system: Optional[str] = None
@@ -28,6 +34,15 @@ class YarnDetailBase(BaseModel):
     uom: str = Field(default="kg", description="Unit of Measure")
     remarks: Optional[str] = None
 
+    @field_validator('yarn_composition_details')
+    @classmethod
+    def validate_composition_total(cls, v):
+        if v is not None:
+            total = sum(item.percentage for item in v)
+            if abs(total - 100.0) > 0.01:  # Allow small floating point errors
+                raise ValueError(f"Composition percentages must total 100%, got {total}%")
+        return v
+
 
 class YarnDetailCreate(YarnDetailBase):
     pass
@@ -36,6 +51,7 @@ class YarnDetailCreate(YarnDetailBase):
 class YarnDetailUpdate(BaseModel):
     yarn_name: Optional[str] = None
     yarn_composition: Optional[str] = None
+    yarn_composition_details: Optional[List[YarnCompositionDetail]] = None
     blend_ratio: Optional[str] = None
     yarn_count: Optional[str] = None
     count_system: Optional[str] = None
@@ -48,9 +64,19 @@ class YarnDetailUpdate(BaseModel):
     uom: Optional[str] = None
     remarks: Optional[str] = None
 
+    @field_validator('yarn_composition_details')
+    @classmethod
+    def validate_composition_total(cls, v):
+        if v is not None:
+            total = sum(item.percentage for item in v)
+            if abs(total - 100.0) > 0.01:
+                raise ValueError(f"Composition percentages must total 100%, got {total}%")
+        return v
+
 
 class YarnDetailResponse(YarnDetailBase):
     id: int
+    yarn_id: str = Field(..., description="Unique Yarn ID")  # Required in response
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -60,7 +86,7 @@ class YarnDetailResponse(YarnDetailBase):
 
 # --- FABRIC SCHEMAS ---
 class FabricDetailBase(BaseModel):
-    fabric_id: str = Field(..., description="Unique Fabric ID")
+    fabric_id: Optional[str] = Field(None, description="Unique Fabric ID (auto-generated if not provided)")
     fabric_name: str = Field(..., description="Fabric Name")
     category: Optional[str] = None
     type: Optional[str] = None
@@ -69,11 +95,13 @@ class FabricDetailBase(BaseModel):
     gsm: Optional[int] = None
     gauge_epi: Optional[str] = None
     width: Optional[str] = None
+    cuttable_width: Optional[str] = None
     stretch: Optional[str] = None
     shrink: Optional[str] = None
     finish: Optional[str] = None
     composition: Optional[str] = None
     handfeel: Optional[str] = None
+    unit_id: int = Field(default=1, description="Unit ID from units system")
     uom: str = Field(default="meter", description="Unit of Measure")
     remarks: Optional[str] = None
 
@@ -91,17 +119,20 @@ class FabricDetailUpdate(BaseModel):
     gsm: Optional[int] = None
     gauge_epi: Optional[str] = None
     width: Optional[str] = None
+    cuttable_width: Optional[str] = None
     stretch: Optional[str] = None
     shrink: Optional[str] = None
     finish: Optional[str] = None
     composition: Optional[str] = None
     handfeel: Optional[str] = None
+    unit_id: Optional[int] = None
     uom: Optional[str] = None
     remarks: Optional[str] = None
 
 
 class FabricDetailResponse(FabricDetailBase):
     id: int
+    fabric_id: str = Field(..., description="Unique Fabric ID")  # Required in response
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -172,6 +203,58 @@ class AccessoriesDetailUpdate(BaseModel):
 
 class AccessoriesDetailResponse(AccessoriesDetailBase):
     id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- MERGED TRIMS & ACCESSORIES SCHEMAS ---
+class TrimsAccessoriesDetailBase(BaseModel):
+    product_id: Optional[str] = Field(None, description="Unique Product ID (auto-generated if not provided)")
+    product_name: str = Field(..., description="Product Name")
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
+    product_type: str = Field(..., description="Product Type: 'trims' or 'accessories'")
+    unit_id: int = Field(default=1, description="Unit ID (reference to units system)")
+    uom: str = Field(default="pcs", description="Unit of Measure")
+    consumable_flag: bool = Field(default=True, description="Is Consumable")
+    remarks: Optional[str] = None
+
+    @field_validator('product_type')
+    @classmethod
+    def validate_product_type(cls, v):
+        if v not in ['trims', 'accessories']:
+            raise ValueError("Product type must be either 'trims' or 'accessories'")
+        return v
+
+
+class TrimsAccessoriesDetailCreate(TrimsAccessoriesDetailBase):
+    pass
+
+
+class TrimsAccessoriesDetailUpdate(BaseModel):
+    product_name: Optional[str] = None
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
+    product_type: Optional[str] = None
+    unit_id: Optional[int] = None
+    uom: Optional[str] = None
+    consumable_flag: Optional[bool] = None
+    remarks: Optional[str] = None
+
+    @field_validator('product_type')
+    @classmethod
+    def validate_product_type(cls, v):
+        if v is not None and v not in ['trims', 'accessories']:
+            raise ValueError("Product type must be either 'trims' or 'accessories'")
+        return v
+
+
+class TrimsAccessoriesDetailResponse(TrimsAccessoriesDetailBase):
+    id: int
+    product_id: str = Field(..., description="Unique Product ID")  # Required in response
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -711,4 +794,274 @@ class CMCalculationResponse(CMCalculationBase):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# ORDER MANAGEMENT SCHEMAS
+# ============================================================================
+
+# --- SALES CONTRACT SCHEMAS ---
+class SalesContractBase(BaseModel):
+    sales_contract_id: Optional[str] = Field(None, description="Auto-generated Sales Contract ID")
+    buyer_id: int = Field(..., description="Buyer ID")
+    buyer_name: Optional[str] = None
+    sales_contract_no: Optional[str] = Field(None, description="Sales Contract / Master LC No")
+    sales_contract_date: Optional[datetime] = None
+    final_amendment_date: Optional[datetime] = None
+    status: str = Field(default="active", description="Status: active, completed, cancelled")
+    remarks: Optional[str] = None
+
+
+class SalesContractCreate(SalesContractBase):
+    pass
+
+
+class SalesContractUpdate(BaseModel):
+    buyer_id: Optional[int] = None
+    buyer_name: Optional[str] = None
+    sales_contract_no: Optional[str] = None
+    sales_contract_date: Optional[datetime] = None
+    final_amendment_date: Optional[datetime] = None
+    status: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class SalesContractResponse(SalesContractBase):
+    id: int
+    sales_contract_id: str
+    total_order_quantity: int = 0
+    total_order_value: float = 0.0
+    no_of_po: int = 0
+    earliest_delivery_date: Optional[datetime] = None
+    final_delivery_date: Optional[datetime] = None
+    amendment_no: int = 0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- ORDER PRIMARY INFO SCHEMAS ---
+class OrderPrimaryInfoBase(BaseModel):
+    order_id: Optional[str] = Field(None, description="Auto-generated Order ID")
+    sales_contract_id: Optional[str] = None
+    buyer_id: int = Field(..., description="Buyer ID")
+    buyer_name: Optional[str] = None
+    order_number: str = Field(..., description="Order Number from buyer")
+    order_date: Optional[datetime] = None
+    scl_po: Optional[str] = None
+    season: Optional[str] = Field(None, description="Season (for H&M)")
+    order_category: Optional[str] = Field(None, description="Order Category (for H&M)")
+    allow_tolerance: bool = Field(default=False)
+    tolerance_percent: float = Field(default=-3.0)
+    status: str = Field(default="pending")
+    remarks: Optional[str] = None
+
+
+class OrderPrimaryInfoCreate(OrderPrimaryInfoBase):
+    style_ids: Optional[List[str]] = Field(None, description="List of Style IDs to link")
+
+
+class OrderPrimaryInfoUpdate(BaseModel):
+    sales_contract_id: Optional[str] = None
+    buyer_id: Optional[int] = None
+    buyer_name: Optional[str] = None
+    order_number: Optional[str] = None
+    order_date: Optional[datetime] = None
+    scl_po: Optional[str] = None
+    season: Optional[str] = None
+    order_category: Optional[str] = None
+    allow_tolerance: Optional[bool] = None
+    tolerance_percent: Optional[float] = None
+    status: Optional[str] = None
+    remarks: Optional[str] = None
+    style_ids: Optional[List[str]] = Field(None, description="List of Style IDs to link")
+
+
+class OrderPrimaryInfoResponse(OrderPrimaryInfoBase):
+    id: int
+    order_id: str
+    total_quantity: int = 0
+    total_value: float = 0.0
+    styles: Optional[List[Dict[str, Any]]] = None  # List of linked styles
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- ORDER STYLE SCHEMAS ---
+class OrderStyleBase(BaseModel):
+    order_id: str = Field(..., description="Order ID")
+    style_id: str = Field(..., description="Style ID")
+    style_name: Optional[str] = None
+
+
+class OrderStyleCreate(OrderStyleBase):
+    pass
+
+
+class OrderStyleResponse(OrderStyleBase):
+    id: int
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- DELIVERY SCHEDULE SCHEMAS ---
+class DeliveryScheduleBase(BaseModel):
+    shipment_id: Optional[str] = Field(None, description="Auto-generated Shipment ID")
+    order_id: str = Field(..., description="Order ID")
+    order_number: Optional[str] = None
+    shipment_date: Optional[datetime] = None
+    destination_country: Optional[str] = None
+    destination_country_code: Optional[str] = None
+    destination_number: Optional[str] = None
+    destination_code: Optional[str] = None
+    incoterms: Optional[str] = Field(None, description="FOB, FOC, CIF, EXW, DDP, etc.")
+    freight_method: Optional[str] = Field(None, description="SEA, AIR, ROAD, TRAIN")
+    status: str = Field(default="scheduled")
+    # PRIMARK-specific fields
+    total_units: Optional[int] = None
+    packs: Optional[int] = None
+    price_ticket: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class DeliveryScheduleCreate(DeliveryScheduleBase):
+    pass
+
+
+class DeliveryScheduleUpdate(BaseModel):
+    order_id: Optional[str] = None
+    order_number: Optional[str] = None
+    shipment_date: Optional[datetime] = None
+    destination_country: Optional[str] = None
+    destination_country_code: Optional[str] = None
+    destination_number: Optional[str] = None
+    destination_code: Optional[str] = None
+    incoterms: Optional[str] = None
+    freight_method: Optional[str] = None
+    status: Optional[str] = None
+    total_units: Optional[int] = None
+    packs: Optional[int] = None
+    price_ticket: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class DeliveryScheduleResponse(DeliveryScheduleBase):
+    id: int
+    shipment_id: str
+    total_quantity: int = 0
+    total_cartons: int = 0
+    total_cbm: float = 0.0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- PACKING DETAIL SCHEMAS ---
+class PackingDetailBase(BaseModel):
+    pack_id: Optional[str] = Field(None, description="Auto-generated Pack ID")
+    shipment_id: str = Field(..., description="Shipment ID")
+    order_id: str = Field(..., description="Order ID")
+    color_ids: Optional[List[str]] = None
+    color_names: Optional[List[str]] = None
+    size_ids: Optional[List[str]] = None
+    size_names: Optional[List[str]] = None
+    quantity_by_size: Optional[Dict[str, int]] = Field(None, description="Size-quantity mapping")
+    net_weight_kg: Optional[float] = None
+    gross_weight_kg: Optional[float] = None
+    length_cm: Optional[float] = None
+    width_cm: Optional[float] = None
+    height_cm: Optional[float] = None
+    max_weight_per_carton: Optional[float] = None
+    carton_quantity: int = Field(default=1)
+    remarks: Optional[str] = None
+
+
+class PackingDetailCreate(PackingDetailBase):
+    pass
+
+
+class PackingDetailUpdate(BaseModel):
+    color_ids: Optional[List[str]] = None
+    color_names: Optional[List[str]] = None
+    size_ids: Optional[List[str]] = None
+    size_names: Optional[List[str]] = None
+    quantity_by_size: Optional[Dict[str, int]] = None
+    net_weight_kg: Optional[float] = None
+    gross_weight_kg: Optional[float] = None
+    length_cm: Optional[float] = None
+    width_cm: Optional[float] = None
+    height_cm: Optional[float] = None
+    max_weight_per_carton: Optional[float] = None
+    carton_quantity: Optional[int] = None
+    remarks: Optional[str] = None
+
+
+class PackingDetailResponse(PackingDetailBase):
+    id: int
+    pack_id: str
+    total_pcs: int = 0
+    cbm: Optional[float] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- ORDER BREAKDOWN SCHEMAS ---
+class OrderBreakdownBase(BaseModel):
+    breakdown_id: Optional[str] = Field(None, description="Auto-generated Breakdown ID")
+    shipment_id: str = Field(..., description="Shipment ID")
+    order_id: str = Field(..., description="Order ID")
+    order_number: Optional[str] = None
+    style_variant_id: str = Field(..., description="Style Variant ID")
+    style_id: Optional[str] = None
+    color_name: Optional[str] = None
+    size_name: Optional[str] = None
+    order_quantity: int = Field(default=0)
+    tolerance_quantity: int = Field(default=0)
+    unit_price: Optional[float] = None
+    status: str = Field(default="pending")
+    remarks: Optional[str] = None
+
+
+class OrderBreakdownCreate(OrderBreakdownBase):
+    pass
+
+
+class OrderBreakdownUpdate(BaseModel):
+    order_quantity: Optional[int] = None
+    tolerance_quantity: Optional[int] = None
+    shipped_quantity: Optional[int] = None
+    unit_price: Optional[float] = None
+    status: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class OrderBreakdownResponse(OrderBreakdownBase):
+    id: int
+    breakdown_id: str
+    shipped_quantity: int = 0
+    total_value: Optional[float] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- BULK OPERATIONS ---
+class OrderBreakdownBulkCreate(BaseModel):
+    """Auto-generate breakdowns from shipment and order styles"""
+    shipment_id: str = Field(..., description="Shipment ID")
+    order_id: str = Field(..., description="Order ID")
 

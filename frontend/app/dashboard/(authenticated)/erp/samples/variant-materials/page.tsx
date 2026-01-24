@@ -18,8 +18,22 @@ import { UnitSelector } from "@/components/uom/UnitSelector";
 import { InlineConverter } from "@/components/uom/InlineConverter";
 import { UnitDisplay } from "@/components/uom/UnitDisplay";
 import { useUnits, useUnitSearch } from "@/hooks/use-units";
+import { UnderDevelopment } from "@/components/under-development";
 
 export default function StyleVariantMaterialsPage() {
+  // Show Under Development overlay - wrapper with relative positioning
+  return (
+    <div className="relative min-h-[calc(100vh-120px)]">
+      <UnderDevelopment
+        title="Variant Materials"
+        message="The Required Material (Style Variant) feature is currently under development and will be available soon."
+      />
+      <StyleVariantMaterialsContent />
+    </div>
+  );
+}
+
+function StyleVariantMaterialsContent() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<any[]>([]);
   const [styleVariants, setStyleVariants] = useState<any[]>([]);

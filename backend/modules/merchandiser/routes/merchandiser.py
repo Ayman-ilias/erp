@@ -9,11 +9,14 @@ from typing import List, Optional
 from core.database import get_db_merchandiser
 from core.logging import setup_logging
 from modules.merchandiser.models.merchandiser import (
-    YarnDetail, FabricDetail, TrimsDetail, AccessoriesDetail,
+    YarnDetail, FabricDetail, TrimsDetail, AccessoriesDetail, TrimsAccessoriesDetail,
     FinishedGoodDetail, PackingGoodDetail, SizeChart,
     SamplePrimaryInfo, SampleTNAColorWise, SampleStatus,
     StyleCreation, StyleBasicInfo, StyleMaterialLink,
-    StyleColor, StyleSize, StyleVariant, CMCalculation
+    StyleColor, StyleSize, StyleVariant, CMCalculation,
+    # Order Management Models
+    SalesContract, OrderPrimaryInfo, OrderStyle,
+    DeliverySchedule, PackingDetail, PackingSizeQuantity, OrderBreakdown
 )
 from modules.merchandiser.schemas.merchandiser import (
     # Yarn schemas
@@ -24,6 +27,8 @@ from modules.merchandiser.schemas.merchandiser import (
     TrimsDetailCreate, TrimsDetailUpdate, TrimsDetailResponse,
     # Accessories schemas
     AccessoriesDetailCreate, AccessoriesDetailUpdate, AccessoriesDetailResponse,
+    # Merged Trims & Accessories schemas
+    TrimsAccessoriesDetailCreate, TrimsAccessoriesDetailUpdate, TrimsAccessoriesDetailResponse,
     # Finished Good schemas
     FinishedGoodDetailCreate, FinishedGoodDetailUpdate, FinishedGoodDetailResponse,
     # Packing Good schemas
@@ -43,6 +48,14 @@ from modules.merchandiser.schemas.merchandiser import (
     StyleVariantCreate, StyleVariantUpdate, StyleVariantResponse, StyleVariantAutoGenerate,
     # CM schemas
     CMCalculationCreate, CMCalculationUpdate, CMCalculationResponse,
+    # Order Management schemas
+    SalesContractCreate, SalesContractUpdate, SalesContractResponse,
+    OrderPrimaryInfoCreate, OrderPrimaryInfoUpdate, OrderPrimaryInfoResponse,
+    OrderStyleCreate, OrderStyleResponse,
+    DeliveryScheduleCreate, DeliveryScheduleUpdate, DeliveryScheduleResponse,
+    PackingDetailCreate, PackingDetailUpdate, PackingDetailResponse,
+    OrderBreakdownCreate, OrderBreakdownUpdate, OrderBreakdownResponse,
+    OrderBreakdownBulkCreate,
 )
 
 router = APIRouter(tags=["Merchandiser"])
@@ -67,6 +80,7 @@ async def merchandiser_root():
                 "fabric": "/merchandiser/fabric",
                 "trims": "/merchandiser/trims",
                 "accessories": "/merchandiser/accessories",
+                "trims_accessories": "/merchandiser/trims-accessories",
                 "finished_good": "/merchandiser/finished-good",
                 "packing_good": "/merchandiser/packing-good",
             },
@@ -103,15 +117,39 @@ async def create_yarn_detail(
     db: Session = Depends(get_db_merchandiser)
 ):
     """Create a new yarn detail"""
-    # Check if yarn_id already exists
-    existing = db.query(YarnDetail).filter(YarnDetail.yarn_id == yarn.yarn_id).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Yarn ID '{yarn.yarn_id}' already exists"
-        )
+    yarn_data = yarn.model_dump()
     
-    db_yarn = YarnDetail(**yarn.model_dump())
+    # Auto-generate yarn_id if not provided or empty
+    if not yarn_data.get("yarn_id") or yarn_data["yarn_id"].strip() == "":
+        # Generate yarn_id based on yarn_name
+        base_name = yarn_data.get("yarn_name", "YARN").upper().replace(" ", "_")[:10]
+        
+        # Find the highest existing number for this base
+        existing_yarns = db.query(YarnDetail).filter(
+            YarnDetail.yarn_id.like(f"{base_name}_%")
+        ).all()
+        
+        max_num = 0
+        for existing in existing_yarns:
+            try:
+                num_part = existing.yarn_id.split("_")[-1]
+                if num_part.isdigit():
+                    max_num = max(max_num, int(num_part))
+            except:
+                continue
+        
+        yarn_data["yarn_id"] = f"{base_name}_{str(max_num + 1).zfill(3)}"
+    
+    # Check if yarn_id already exists (but skip empty yarn_id check for auto-generated IDs)
+    if yarn_data["yarn_id"].strip() != "":
+        existing = db.query(YarnDetail).filter(YarnDetail.yarn_id == yarn_data["yarn_id"]).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Yarn ID '{yarn_data['yarn_id']}' already exists"
+            )
+    
+    db_yarn = YarnDetail(**yarn_data)
     db.add(db_yarn)
     db.commit()
     db.refresh(db_yarn)
@@ -195,14 +233,39 @@ async def create_fabric_detail(
     db: Session = Depends(get_db_merchandiser)
 ):
     """Create a new fabric detail"""
-    existing = db.query(FabricDetail).filter(FabricDetail.fabric_id == fabric.fabric_id).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Fabric ID '{fabric.fabric_id}' already exists"
-        )
+    fabric_data = fabric.model_dump()
     
-    db_fabric = FabricDetail(**fabric.model_dump())
+    # Auto-generate fabric_id if not provided or empty
+    if not fabric_data.get("fabric_id") or fabric_data["fabric_id"].strip() == "":
+        # Generate fabric_id based on fabric_name
+        base_name = fabric_data.get("fabric_name", "FABRIC").upper().replace(" ", "_")[:10]
+        
+        # Find the highest existing number for this base
+        existing_fabrics = db.query(FabricDetail).filter(
+            FabricDetail.fabric_id.like(f"{base_name}_%")
+        ).all()
+        
+        max_num = 0
+        for existing in existing_fabrics:
+            try:
+                num_part = existing.fabric_id.split("_")[-1]
+                if num_part.isdigit():
+                    max_num = max(max_num, int(num_part))
+            except:
+                continue
+        
+        fabric_data["fabric_id"] = f"{base_name}_{str(max_num + 1).zfill(3)}"
+    
+    # Check if fabric_id already exists (but skip empty fabric_id check for auto-generated IDs)
+    if fabric_data["fabric_id"].strip() != "":
+        existing = db.query(FabricDetail).filter(FabricDetail.fabric_id == fabric_data["fabric_id"]).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Fabric ID '{fabric_data['fabric_id']}' already exists"
+            )
+    
+    db_fabric = FabricDetail(**fabric_data)
     db.add(db_fabric)
     db.commit()
     db.refresh(db_fabric)
@@ -464,6 +527,142 @@ async def delete_accessories_detail(
         )
     
     db.delete(db_accessories)
+    db.commit()
+    return None
+
+
+# ============================================================================
+# MERGED TRIMS & ACCESSORIES DETAILS ROUTES
+# ============================================================================
+
+def generate_product_id(product_name: str, product_type: str, db: Session) -> str:
+    """Generate unique product ID for trims/accessories"""
+    base_name = product_name.upper().replace(" ", "_")[:10]
+    type_prefix = "T" if product_type == "trims" else "A"
+    
+    counter = 1
+    while True:
+        product_id = f"{type_prefix}_{base_name}_{counter:03d}"
+        existing = db.query(TrimsAccessoriesDetail).filter(
+            TrimsAccessoriesDetail.product_id == product_id
+        ).first()
+        if not existing:
+            return product_id
+        counter += 1
+
+
+@router.post("/trims-accessories", response_model=TrimsAccessoriesDetailResponse, status_code=status.HTTP_201_CREATED)
+async def create_trims_accessories_detail(
+    item: TrimsAccessoriesDetailCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Create a new trims or accessories detail"""
+    # Auto-generate product_id if not provided
+    if not item.product_id:
+        item.product_id = generate_product_id(item.product_name, item.product_type, db)
+    
+    # Check if product_id already exists
+    existing = db.query(TrimsAccessoriesDetail).filter(
+        TrimsAccessoriesDetail.product_id == item.product_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Product ID '{item.product_id}' already exists"
+        )
+    
+    db_item = TrimsAccessoriesDetail(**item.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+@router.get("/trims-accessories", response_model=List[TrimsAccessoriesDetailResponse])
+async def get_all_trims_accessories_details(
+    product_type: Optional[str] = None,
+    skip: int = 0,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get all trims and accessories details with optional filtering by type"""
+    query = db.query(TrimsAccessoriesDetail).order_by(desc(TrimsAccessoriesDetail.created_at))
+    
+    if product_type:
+        if product_type not in ['trims', 'accessories']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Product type must be either 'trims' or 'accessories'"
+            )
+        query = query.filter(TrimsAccessoriesDetail.product_type == product_type)
+    
+    if limit:
+        query = query.limit(limit)
+    if skip:
+        query = query.offset(skip)
+    
+    items = query.all()
+    return items
+
+
+@router.get("/trims-accessories/{product_id}", response_model=TrimsAccessoriesDetailResponse)
+async def get_trims_accessories_detail(
+    product_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get a specific trims or accessories detail"""
+    item = db.query(TrimsAccessoriesDetail).filter(
+        TrimsAccessoriesDetail.product_id == product_id
+    ).first()
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product ID '{product_id}' not found"
+        )
+    return item
+
+
+@router.put("/trims-accessories/{product_id}", response_model=TrimsAccessoriesDetailResponse)
+async def update_trims_accessories_detail(
+    product_id: str,
+    item_update: TrimsAccessoriesDetailUpdate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Update a trims or accessories detail"""
+    db_item = db.query(TrimsAccessoriesDetail).filter(
+        TrimsAccessoriesDetail.product_id == product_id
+    ).first()
+    if not db_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product ID '{product_id}' not found"
+        )
+    
+    update_data = item_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_item, field, value)
+    
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+@router.delete("/trims-accessories/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_trims_accessories_detail(
+    product_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Delete a trims or accessories detail"""
+    db_item = db.query(TrimsAccessoriesDetail).filter(
+        TrimsAccessoriesDetail.product_id == product_id
+    ).first()
+    if not db_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product ID '{product_id}' not found"
+        )
+    
+    db.delete(db_item)
     db.commit()
     return None
 
@@ -2592,7 +2791,893 @@ async def delete_cm_calculation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"CM ID '{cm_id}' not found"
         )
-    
+
     db.delete(db_cm_calc)
+    db.commit()
+    return None
+
+
+# ============================================================================
+# ORDER MANAGEMENT - SALES CONTRACT ROUTES
+# ============================================================================
+
+def generate_sales_contract_id(db: Session) -> str:
+    """Generate unique Sales Contract ID: SC-YYYYMMDD-XXX"""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    prefix = f"SC-{today}-"
+
+    # Find the highest existing number for today
+    existing = db.query(SalesContract).filter(
+        SalesContract.sales_contract_id.like(f"{prefix}%")
+    ).order_by(desc(SalesContract.sales_contract_id)).first()
+
+    if existing:
+        try:
+            last_num = int(existing.sales_contract_id.split("-")[-1])
+            return f"{prefix}{str(last_num + 1).zfill(3)}"
+        except:
+            pass
+
+    return f"{prefix}001"
+
+
+@router.post("/sales-contracts", response_model=SalesContractResponse, status_code=status.HTTP_201_CREATED)
+async def create_sales_contract(
+    contract: SalesContractCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Create a new sales contract"""
+    data = contract.model_dump()
+
+    # Auto-generate ID if not provided
+    if not data.get("sales_contract_id"):
+        data["sales_contract_id"] = generate_sales_contract_id(db)
+
+    # Check if already exists
+    existing = db.query(SalesContract).filter(
+        SalesContract.sales_contract_id == data["sales_contract_id"]
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Sales Contract ID '{data['sales_contract_id']}' already exists"
+        )
+
+    db_contract = SalesContract(**data)
+    db.add(db_contract)
+    db.commit()
+    db.refresh(db_contract)
+    return db_contract
+
+
+@router.get("/sales-contracts", response_model=List[SalesContractResponse])
+async def get_all_sales_contracts(
+    buyer_id: Optional[int] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get all sales contracts"""
+    query = db.query(SalesContract)
+    if buyer_id:
+        query = query.filter(SalesContract.buyer_id == buyer_id)
+    if status:
+        query = query.filter(SalesContract.status == status)
+
+    contracts = query.order_by(desc(SalesContract.created_at)).offset(skip).limit(limit).all()
+    return contracts
+
+
+@router.get("/sales-contracts/{sales_contract_id}", response_model=SalesContractResponse)
+async def get_sales_contract(
+    sales_contract_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get a specific sales contract"""
+    contract = db.query(SalesContract).filter(
+        SalesContract.sales_contract_id == sales_contract_id
+    ).first()
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sales Contract '{sales_contract_id}' not found"
+        )
+    return contract
+
+
+@router.put("/sales-contracts/{sales_contract_id}", response_model=SalesContractResponse)
+async def update_sales_contract(
+    sales_contract_id: str,
+    contract_update: SalesContractUpdate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Update a sales contract"""
+    db_contract = db.query(SalesContract).filter(
+        SalesContract.sales_contract_id == sales_contract_id
+    ).first()
+    if not db_contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sales Contract '{sales_contract_id}' not found"
+        )
+
+    update_data = contract_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_contract, field, value)
+
+    db.commit()
+    db.refresh(db_contract)
+    return db_contract
+
+
+@router.delete("/sales-contracts/{sales_contract_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sales_contract(
+    sales_contract_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Delete a sales contract"""
+    db_contract = db.query(SalesContract).filter(
+        SalesContract.sales_contract_id == sales_contract_id
+    ).first()
+    if not db_contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sales Contract '{sales_contract_id}' not found"
+        )
+
+    db.delete(db_contract)
+    db.commit()
+    return None
+
+
+# ============================================================================
+# ORDER MANAGEMENT - ORDER PRIMARY INFO ROUTES
+# ============================================================================
+
+def generate_order_id(db: Session) -> str:
+    """Generate unique Order ID: ORD-YYYYMMDD-XXX"""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    prefix = f"ORD-{today}-"
+
+    existing = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id.like(f"{prefix}%")
+    ).order_by(desc(OrderPrimaryInfo.order_id)).first()
+
+    if existing:
+        try:
+            last_num = int(existing.order_id.split("-")[-1])
+            return f"{prefix}{str(last_num + 1).zfill(3)}"
+        except:
+            pass
+
+    return f"{prefix}001"
+
+
+@router.post("/orders", response_model=OrderPrimaryInfoResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(
+    order: OrderPrimaryInfoCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Create a new order"""
+    data = order.model_dump()
+    style_ids = data.pop("style_ids", None)
+
+    # Auto-generate ID if not provided
+    if not data.get("order_id"):
+        data["order_id"] = generate_order_id(db)
+
+    # Check if already exists
+    existing = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id == data["order_id"]
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Order ID '{data['order_id']}' already exists"
+        )
+
+    db_order = OrderPrimaryInfo(**data)
+    db.add(db_order)
+    db.commit()
+    db.refresh(db_order)
+
+    # Link styles if provided
+    if style_ids:
+        for style_id in style_ids:
+            # Get style name from StyleCreation
+            style = db.query(StyleCreation).filter(StyleCreation.style_id == style_id).first()
+            style_name = style.style_name if style else None
+
+            order_style = OrderStyle(
+                order_id=db_order.order_id,
+                style_id=style_id,
+                style_name=style_name
+            )
+            db.add(order_style)
+        db.commit()
+
+    # Update sales contract totals
+    if db_order.sales_contract_id:
+        update_sales_contract_totals(db, db_order.sales_contract_id)
+
+    return db_order
+
+
+@router.get("/orders", response_model=List[OrderPrimaryInfoResponse])
+async def get_all_orders(
+    buyer_id: Optional[int] = None,
+    sales_contract_id: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get all orders"""
+    query = db.query(OrderPrimaryInfo)
+    if buyer_id:
+        query = query.filter(OrderPrimaryInfo.buyer_id == buyer_id)
+    if sales_contract_id:
+        query = query.filter(OrderPrimaryInfo.sales_contract_id == sales_contract_id)
+    if status:
+        query = query.filter(OrderPrimaryInfo.status == status)
+
+    orders = query.order_by(desc(OrderPrimaryInfo.created_at)).offset(skip).limit(limit).all()
+
+    # Add linked styles to each order
+    result = []
+    for order in orders:
+        order_dict = {
+            "id": order.id,
+            "order_id": order.order_id,
+            "sales_contract_id": order.sales_contract_id,
+            "buyer_id": order.buyer_id,
+            "buyer_name": order.buyer_name,
+            "order_number": order.order_number,
+            "order_date": order.order_date,
+            "scl_po": order.scl_po,
+            "season": order.season,
+            "order_category": order.order_category,
+            "allow_tolerance": order.allow_tolerance,
+            "tolerance_percent": order.tolerance_percent,
+            "total_quantity": order.total_quantity,
+            "total_value": order.total_value,
+            "status": order.status,
+            "remarks": order.remarks,
+            "created_at": order.created_at,
+            "updated_at": order.updated_at,
+            "styles": []
+        }
+
+        # Get linked styles
+        styles = db.query(OrderStyle).filter(OrderStyle.order_id == order.order_id).all()
+        order_dict["styles"] = [{"style_id": s.style_id, "style_name": s.style_name} for s in styles]
+
+        result.append(order_dict)
+
+    return result
+
+
+@router.get("/orders/{order_id}", response_model=OrderPrimaryInfoResponse)
+async def get_order(
+    order_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get a specific order"""
+    order = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id == order_id
+    ).first()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order '{order_id}' not found"
+        )
+
+    # Get linked styles
+    styles = db.query(OrderStyle).filter(OrderStyle.order_id == order_id).all()
+
+    return {
+        **order.__dict__,
+        "styles": [{"style_id": s.style_id, "style_name": s.style_name} for s in styles]
+    }
+
+
+@router.put("/orders/{order_id}", response_model=OrderPrimaryInfoResponse)
+async def update_order(
+    order_id: str,
+    order_update: OrderPrimaryInfoUpdate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Update an order"""
+    db_order = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id == order_id
+    ).first()
+    if not db_order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order '{order_id}' not found"
+        )
+
+    update_data = order_update.model_dump(exclude_unset=True)
+    style_ids = update_data.pop("style_ids", None)
+
+    for field, value in update_data.items():
+        setattr(db_order, field, value)
+
+    # Update linked styles if provided
+    if style_ids is not None:
+        # Remove existing links
+        db.query(OrderStyle).filter(OrderStyle.order_id == order_id).delete()
+
+        # Add new links
+        for style_id in style_ids:
+            style = db.query(StyleCreation).filter(StyleCreation.style_id == style_id).first()
+            style_name = style.style_name if style else None
+
+            order_style = OrderStyle(
+                order_id=order_id,
+                style_id=style_id,
+                style_name=style_name
+            )
+            db.add(order_style)
+
+    db.commit()
+    db.refresh(db_order)
+
+    # Update sales contract totals
+    if db_order.sales_contract_id:
+        update_sales_contract_totals(db, db_order.sales_contract_id)
+
+    return db_order
+
+
+@router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_order(
+    order_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Delete an order"""
+    db_order = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id == order_id
+    ).first()
+    if not db_order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order '{order_id}' not found"
+        )
+
+    sales_contract_id = db_order.sales_contract_id
+
+    # Delete linked styles
+    db.query(OrderStyle).filter(OrderStyle.order_id == order_id).delete()
+
+    db.delete(db_order)
+    db.commit()
+
+    # Update sales contract totals
+    if sales_contract_id:
+        update_sales_contract_totals(db, sales_contract_id)
+
+    return None
+
+
+def update_sales_contract_totals(db: Session, sales_contract_id: str):
+    """Update sales contract aggregated fields from child orders"""
+    contract = db.query(SalesContract).filter(
+        SalesContract.sales_contract_id == sales_contract_id
+    ).first()
+
+    if not contract:
+        return
+
+    orders = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.sales_contract_id == sales_contract_id
+    ).all()
+
+    contract.no_of_po = len(orders)
+    contract.total_order_quantity = sum(o.total_quantity or 0 for o in orders)
+    contract.total_order_value = sum(o.total_value or 0.0 for o in orders)
+
+    # Get delivery dates from delivery schedules
+    shipments = db.query(DeliverySchedule).filter(
+        DeliverySchedule.order_id.in_([o.order_id for o in orders])
+    ).all()
+
+    if shipments:
+        dates = [s.shipment_date for s in shipments if s.shipment_date]
+        if dates:
+            contract.earliest_delivery_date = min(dates)
+            contract.final_delivery_date = max(dates)
+
+    db.commit()
+
+
+# ============================================================================
+# ORDER MANAGEMENT - DELIVERY SCHEDULE ROUTES
+# ============================================================================
+
+def generate_shipment_id(db: Session) -> str:
+    """Generate unique Shipment ID: SHP-YYYYMMDD-XXX"""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    prefix = f"SHP-{today}-"
+
+    existing = db.query(DeliverySchedule).filter(
+        DeliverySchedule.shipment_id.like(f"{prefix}%")
+    ).order_by(desc(DeliverySchedule.shipment_id)).first()
+
+    if existing:
+        try:
+            last_num = int(existing.shipment_id.split("-")[-1])
+            return f"{prefix}{str(last_num + 1).zfill(3)}"
+        except:
+            pass
+
+    return f"{prefix}001"
+
+
+@router.post("/delivery-schedules", response_model=DeliveryScheduleResponse, status_code=status.HTTP_201_CREATED)
+async def create_delivery_schedule(
+    schedule: DeliveryScheduleCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Create a new delivery schedule"""
+    data = schedule.model_dump()
+
+    # Auto-generate ID if not provided
+    if not data.get("shipment_id"):
+        data["shipment_id"] = generate_shipment_id(db)
+
+    # Get order number from order
+    order = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id == data["order_id"]
+    ).first()
+    if order:
+        data["order_number"] = order.order_number
+
+    db_schedule = DeliverySchedule(**data)
+    db.add(db_schedule)
+    db.commit()
+    db.refresh(db_schedule)
+
+    # Update sales contract totals
+    if order and order.sales_contract_id:
+        update_sales_contract_totals(db, order.sales_contract_id)
+
+    return db_schedule
+
+
+@router.get("/delivery-schedules", response_model=List[DeliveryScheduleResponse])
+async def get_all_delivery_schedules(
+    order_id: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get all delivery schedules"""
+    query = db.query(DeliverySchedule)
+    if order_id:
+        query = query.filter(DeliverySchedule.order_id == order_id)
+    if status:
+        query = query.filter(DeliverySchedule.status == status)
+
+    schedules = query.order_by(desc(DeliverySchedule.created_at)).offset(skip).limit(limit).all()
+    return schedules
+
+
+@router.get("/delivery-schedules/{shipment_id}", response_model=DeliveryScheduleResponse)
+async def get_delivery_schedule(
+    shipment_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get a specific delivery schedule"""
+    schedule = db.query(DeliverySchedule).filter(
+        DeliverySchedule.shipment_id == shipment_id
+    ).first()
+    if not schedule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Shipment '{shipment_id}' not found"
+        )
+    return schedule
+
+
+@router.put("/delivery-schedules/{shipment_id}", response_model=DeliveryScheduleResponse)
+async def update_delivery_schedule(
+    shipment_id: str,
+    schedule_update: DeliveryScheduleUpdate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Update a delivery schedule"""
+    db_schedule = db.query(DeliverySchedule).filter(
+        DeliverySchedule.shipment_id == shipment_id
+    ).first()
+    if not db_schedule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Shipment '{shipment_id}' not found"
+        )
+
+    update_data = schedule_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_schedule, field, value)
+
+    db.commit()
+    db.refresh(db_schedule)
+    return db_schedule
+
+
+@router.delete("/delivery-schedules/{shipment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_delivery_schedule(
+    shipment_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Delete a delivery schedule"""
+    db_schedule = db.query(DeliverySchedule).filter(
+        DeliverySchedule.shipment_id == shipment_id
+    ).first()
+    if not db_schedule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Shipment '{shipment_id}' not found"
+        )
+
+    db.delete(db_schedule)
+    db.commit()
+    return None
+
+
+# ============================================================================
+# ORDER MANAGEMENT - PACKING DETAIL ROUTES
+# ============================================================================
+
+def generate_pack_id(db: Session) -> str:
+    """Generate unique Pack ID: PCK-YYYYMMDD-XXX"""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    prefix = f"PCK-{today}-"
+
+    existing = db.query(PackingDetail).filter(
+        PackingDetail.pack_id.like(f"{prefix}%")
+    ).order_by(desc(PackingDetail.pack_id)).first()
+
+    if existing:
+        try:
+            last_num = int(existing.pack_id.split("-")[-1])
+            return f"{prefix}{str(last_num + 1).zfill(3)}"
+        except:
+            pass
+
+    return f"{prefix}001"
+
+
+@router.post("/packing-details", response_model=PackingDetailResponse, status_code=status.HTTP_201_CREATED)
+async def create_packing_detail(
+    packing: PackingDetailCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Create a new packing detail"""
+    data = packing.model_dump()
+
+    # Auto-generate ID if not provided
+    if not data.get("pack_id"):
+        data["pack_id"] = generate_pack_id(db)
+
+    # Calculate total_pcs from quantity_by_size
+    if data.get("quantity_by_size"):
+        data["total_pcs"] = sum(data["quantity_by_size"].values())
+
+    # Calculate CBM if dimensions provided
+    if data.get("length_cm") and data.get("width_cm") and data.get("height_cm"):
+        data["cbm"] = (data["length_cm"] * data["width_cm"] * data["height_cm"]) / 1000000
+
+    db_packing = PackingDetail(**data)
+    db.add(db_packing)
+    db.commit()
+    db.refresh(db_packing)
+    return db_packing
+
+
+@router.get("/packing-details", response_model=List[PackingDetailResponse])
+async def get_all_packing_details(
+    shipment_id: Optional[str] = None,
+    order_id: Optional[str] = None,
+    skip: int = 0,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get all packing details"""
+    query = db.query(PackingDetail)
+    if shipment_id:
+        query = query.filter(PackingDetail.shipment_id == shipment_id)
+    if order_id:
+        query = query.filter(PackingDetail.order_id == order_id)
+
+    packings = query.order_by(desc(PackingDetail.created_at)).offset(skip).limit(limit).all()
+    return packings
+
+
+@router.get("/packing-details/{pack_id}", response_model=PackingDetailResponse)
+async def get_packing_detail(
+    pack_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get a specific packing detail"""
+    packing = db.query(PackingDetail).filter(
+        PackingDetail.pack_id == pack_id
+    ).first()
+    if not packing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pack '{pack_id}' not found"
+        )
+    return packing
+
+
+@router.put("/packing-details/{pack_id}", response_model=PackingDetailResponse)
+async def update_packing_detail(
+    pack_id: str,
+    packing_update: PackingDetailUpdate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Update a packing detail"""
+    db_packing = db.query(PackingDetail).filter(
+        PackingDetail.pack_id == pack_id
+    ).first()
+    if not db_packing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pack '{pack_id}' not found"
+        )
+
+    update_data = packing_update.model_dump(exclude_unset=True)
+
+    # Recalculate total_pcs if quantity_by_size changed
+    if "quantity_by_size" in update_data and update_data["quantity_by_size"]:
+        update_data["total_pcs"] = sum(update_data["quantity_by_size"].values())
+
+    # Recalculate CBM if dimensions changed
+    length = update_data.get("length_cm", db_packing.length_cm)
+    width = update_data.get("width_cm", db_packing.width_cm)
+    height = update_data.get("height_cm", db_packing.height_cm)
+    if length and width and height:
+        update_data["cbm"] = (length * width * height) / 1000000
+
+    for field, value in update_data.items():
+        setattr(db_packing, field, value)
+
+    db.commit()
+    db.refresh(db_packing)
+    return db_packing
+
+
+@router.delete("/packing-details/{pack_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_packing_detail(
+    pack_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Delete a packing detail"""
+    db_packing = db.query(PackingDetail).filter(
+        PackingDetail.pack_id == pack_id
+    ).first()
+    if not db_packing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pack '{pack_id}' not found"
+        )
+
+    db.delete(db_packing)
+    db.commit()
+    return None
+
+
+# ============================================================================
+# ORDER MANAGEMENT - ORDER BREAKDOWN ROUTES
+# ============================================================================
+
+def generate_breakdown_id(db: Session) -> str:
+    """Generate unique Breakdown ID: BRK-YYYYMMDD-XXX"""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    prefix = f"BRK-{today}-"
+
+    existing = db.query(OrderBreakdown).filter(
+        OrderBreakdown.breakdown_id.like(f"{prefix}%")
+    ).order_by(desc(OrderBreakdown.breakdown_id)).first()
+
+    if existing:
+        try:
+            last_num = int(existing.breakdown_id.split("-")[-1])
+            return f"{prefix}{str(last_num + 1).zfill(3)}"
+        except:
+            pass
+
+    return f"{prefix}001"
+
+
+@router.post("/order-breakdowns", response_model=OrderBreakdownResponse, status_code=status.HTTP_201_CREATED)
+async def create_order_breakdown(
+    breakdown: OrderBreakdownCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Create a new order breakdown"""
+    data = breakdown.model_dump()
+
+    # Auto-generate ID if not provided
+    if not data.get("breakdown_id"):
+        data["breakdown_id"] = generate_breakdown_id(db)
+
+    # Calculate total_value
+    if data.get("order_quantity") and data.get("unit_price"):
+        data["total_value"] = data["order_quantity"] * data["unit_price"]
+
+    db_breakdown = OrderBreakdown(**data)
+    db.add(db_breakdown)
+    db.commit()
+    db.refresh(db_breakdown)
+    return db_breakdown
+
+
+@router.post("/order-breakdowns/bulk-generate", response_model=List[OrderBreakdownResponse])
+async def bulk_generate_order_breakdowns(
+    request: OrderBreakdownBulkCreate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Auto-generate order breakdowns from shipment and order styles"""
+    shipment = db.query(DeliverySchedule).filter(
+        DeliverySchedule.shipment_id == request.shipment_id
+    ).first()
+    if not shipment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Shipment '{request.shipment_id}' not found"
+        )
+
+    # Get order and its styles
+    order = db.query(OrderPrimaryInfo).filter(
+        OrderPrimaryInfo.order_id == request.order_id
+    ).first()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order '{request.order_id}' not found"
+        )
+
+    # Get styles linked to this order
+    order_styles = db.query(OrderStyle).filter(OrderStyle.order_id == request.order_id).all()
+
+    # Get all variants for each style
+    breakdowns = []
+    for order_style in order_styles:
+        variants = db.query(StyleVariant).filter(
+            StyleVariant.style_id == order_style.style_id,
+            StyleVariant.is_active == True
+        ).all()
+
+        for variant in variants:
+            # Check if breakdown already exists
+            existing = db.query(OrderBreakdown).filter(
+                OrderBreakdown.shipment_id == request.shipment_id,
+                OrderBreakdown.style_variant_id == variant.style_variant_id
+            ).first()
+
+            if not existing:
+                breakdown = OrderBreakdown(
+                    breakdown_id=generate_breakdown_id(db),
+                    shipment_id=request.shipment_id,
+                    order_id=request.order_id,
+                    order_number=order.order_number,
+                    style_variant_id=variant.style_variant_id,
+                    style_id=variant.style_id,
+                    color_name=variant.color_name,
+                    size_name=variant.size_name,
+                    order_quantity=0,
+                    tolerance_quantity=0,
+                    status="pending"
+                )
+                db.add(breakdown)
+                breakdowns.append(breakdown)
+
+    if breakdowns:
+        db.commit()
+        for b in breakdowns:
+            db.refresh(b)
+
+    return breakdowns
+
+
+@router.get("/order-breakdowns", response_model=List[OrderBreakdownResponse])
+async def get_all_order_breakdowns(
+    shipment_id: Optional[str] = None,
+    order_id: Optional[str] = None,
+    style_id: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get all order breakdowns"""
+    query = db.query(OrderBreakdown)
+    if shipment_id:
+        query = query.filter(OrderBreakdown.shipment_id == shipment_id)
+    if order_id:
+        query = query.filter(OrderBreakdown.order_id == order_id)
+    if style_id:
+        query = query.filter(OrderBreakdown.style_id == style_id)
+    if status:
+        query = query.filter(OrderBreakdown.status == status)
+
+    breakdowns = query.order_by(desc(OrderBreakdown.created_at)).offset(skip).limit(limit).all()
+    return breakdowns
+
+
+@router.get("/order-breakdowns/{breakdown_id}", response_model=OrderBreakdownResponse)
+async def get_order_breakdown(
+    breakdown_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Get a specific order breakdown"""
+    breakdown = db.query(OrderBreakdown).filter(
+        OrderBreakdown.breakdown_id == breakdown_id
+    ).first()
+    if not breakdown:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Breakdown '{breakdown_id}' not found"
+        )
+    return breakdown
+
+
+@router.put("/order-breakdowns/{breakdown_id}", response_model=OrderBreakdownResponse)
+async def update_order_breakdown(
+    breakdown_id: str,
+    breakdown_update: OrderBreakdownUpdate,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Update an order breakdown"""
+    db_breakdown = db.query(OrderBreakdown).filter(
+        OrderBreakdown.breakdown_id == breakdown_id
+    ).first()
+    if not db_breakdown:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Breakdown '{breakdown_id}' not found"
+        )
+
+    update_data = breakdown_update.model_dump(exclude_unset=True)
+
+    # Recalculate total_value if quantity or price changed
+    qty = update_data.get("order_quantity", db_breakdown.order_quantity)
+    price = update_data.get("unit_price", db_breakdown.unit_price)
+    if qty and price:
+        update_data["total_value"] = qty * price
+
+    for field, value in update_data.items():
+        setattr(db_breakdown, field, value)
+
+    db.commit()
+    db.refresh(db_breakdown)
+    return db_breakdown
+
+
+@router.delete("/order-breakdowns/{breakdown_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_order_breakdown(
+    breakdown_id: str,
+    db: Session = Depends(get_db_merchandiser)
+):
+    """Delete an order breakdown"""
+    db_breakdown = db.query(OrderBreakdown).filter(
+        OrderBreakdown.breakdown_id == breakdown_id
+    ).first()
+    if not db_breakdown:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Breakdown '{breakdown_id}' not found"
+        )
+
+    db.delete(db_breakdown)
     db.commit()
     return None

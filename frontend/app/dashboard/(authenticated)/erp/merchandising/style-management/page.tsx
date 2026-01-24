@@ -36,6 +36,7 @@ import { Plus, ArrowLeft, Loader2, Edit, Trash2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { toast } from "sonner";
+import { UnderDevelopment } from "@/components/under-development";
 
 // ========== DIALOG COMPONENTS (Defined before main component for TypeScript) ==========
 
@@ -517,6 +518,19 @@ function StyleVariantDialog({
 }
 
 export default function StyleManagementPage() {
+  // Show Under Development overlay - wrapper with relative positioning
+  return (
+    <div className="relative min-h-[calc(100vh-120px)]">
+      <UnderDevelopment
+        title="Style Management"
+        message="The Style Management feature is currently under development and will be available soon."
+      />
+      <StyleManagementContent />
+    </div>
+  );
+}
+
+function StyleManagementContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("creation");

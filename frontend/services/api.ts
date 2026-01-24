@@ -176,13 +176,14 @@ export const usersService = {
       username: string;
       email: string;
       password: string;
-      full_name: string;
+      full_name?: string;
       role?: string;
       department?: string;
       designation?: string;
       is_active?: boolean;
       is_superuser?: boolean;
       department_access?: string[];
+      page_permissions?: Record<string, Record<string, { read: boolean; write: boolean }>>;
     },
     token: string
   ) => {
@@ -2451,6 +2452,169 @@ export const merchandiserService = {
         null,
         "DELETE"
       );
+    },
+  },
+
+  // ========== ORDER MANAGEMENT ==========
+
+  // Sales Contract
+  salesContracts: {
+    getAll: async (limit?: number) => {
+      const basePath = getBasePath();
+      const params = limit ? `?limit=${limit}` : "";
+      return getAPIResponse(basePath, `/merchandiser/sales-contracts${params}`, null, "GET");
+    },
+    getById: async (salesContractId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/sales-contracts/${salesContractId}`, null, "GET");
+    },
+    create: async (data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/sales-contracts`, null, "POST", JSON.stringify(data));
+    },
+    update: async (salesContractId: string, data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/sales-contracts/${salesContractId}`, null, "PUT", JSON.stringify(data));
+    },
+    delete: async (salesContractId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/sales-contracts/${salesContractId}`, null, "DELETE");
+    },
+  },
+
+  // Orders (Order Primary Info)
+  orders: {
+    getAll: async (salesContractId?: string, limit?: number) => {
+      const basePath = getBasePath();
+      let params = "";
+      if (salesContractId || limit) {
+        const queryParams = [];
+        if (salesContractId) queryParams.push(`sales_contract_id=${salesContractId}`);
+        if (limit) queryParams.push(`limit=${limit}`);
+        params = `?${queryParams.join("&")}`;
+      }
+      return getAPIResponse(basePath, `/merchandiser/orders${params}`, null, "GET");
+    },
+    getById: async (orderId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/orders/${orderId}`, null, "GET");
+    },
+    create: async (data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/orders`, null, "POST", JSON.stringify(data));
+    },
+    update: async (orderId: string, data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/orders/${orderId}`, null, "PUT", JSON.stringify(data));
+    },
+    delete: async (orderId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/orders/${orderId}`, null, "DELETE");
+    },
+    linkStyle: async (orderId: string, styleId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/orders/${orderId}/styles/${styleId}`, null, "POST");
+    },
+    unlinkStyle: async (orderId: string, styleId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/orders/${orderId}/styles/${styleId}`, null, "DELETE");
+    },
+  },
+
+  // Delivery Schedules
+  deliverySchedules: {
+    getAll: async (orderId?: string, limit?: number) => {
+      const basePath = getBasePath();
+      let params = "";
+      if (orderId || limit) {
+        const queryParams = [];
+        if (orderId) queryParams.push(`order_id=${orderId}`);
+        if (limit) queryParams.push(`limit=${limit}`);
+        params = `?${queryParams.join("&")}`;
+      }
+      return getAPIResponse(basePath, `/merchandiser/delivery-schedules${params}`, null, "GET");
+    },
+    getById: async (shipmentId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/delivery-schedules/${shipmentId}`, null, "GET");
+    },
+    create: async (data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/delivery-schedules`, null, "POST", JSON.stringify(data));
+    },
+    update: async (shipmentId: string, data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/delivery-schedules/${shipmentId}`, null, "PUT", JSON.stringify(data));
+    },
+    delete: async (shipmentId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/delivery-schedules/${shipmentId}`, null, "DELETE");
+    },
+  },
+
+  // Packing Details
+  packingDetails: {
+    getAll: async (shipmentId?: string, limit?: number) => {
+      const basePath = getBasePath();
+      let params = "";
+      if (shipmentId || limit) {
+        const queryParams = [];
+        if (shipmentId) queryParams.push(`shipment_id=${shipmentId}`);
+        if (limit) queryParams.push(`limit=${limit}`);
+        params = `?${queryParams.join("&")}`;
+      }
+      return getAPIResponse(basePath, `/merchandiser/packing-details${params}`, null, "GET");
+    },
+    getById: async (packId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/packing-details/${packId}`, null, "GET");
+    },
+    create: async (data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/packing-details`, null, "POST", JSON.stringify(data));
+    },
+    update: async (packId: string, data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/packing-details/${packId}`, null, "PUT", JSON.stringify(data));
+    },
+    delete: async (packId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/packing-details/${packId}`, null, "DELETE");
+    },
+  },
+
+  // Order Breakdowns
+  orderBreakdowns: {
+    getAll: async (shipmentId?: string, limit?: number) => {
+      const basePath = getBasePath();
+      let params = "";
+      if (shipmentId || limit) {
+        const queryParams = [];
+        if (shipmentId) queryParams.push(`shipment_id=${shipmentId}`);
+        if (limit) queryParams.push(`limit=${limit}`);
+        params = `?${queryParams.join("&")}`;
+      }
+      return getAPIResponse(basePath, `/merchandiser/order-breakdowns${params}`, null, "GET");
+    },
+    getById: async (breakdownId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/order-breakdowns/${breakdownId}`, null, "GET");
+    },
+    create: async (data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/order-breakdowns`, null, "POST", JSON.stringify(data));
+    },
+    bulkGenerate: async (shipmentId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/order-breakdowns/bulk-generate/${shipmentId}`, null, "POST");
+    },
+    update: async (breakdownId: string, data: any) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/order-breakdowns/${breakdownId}`, null, "PUT", JSON.stringify(data));
+    },
+    delete: async (breakdownId: string) => {
+      const basePath = getBasePath();
+      return getAPIResponse(basePath, `/merchandiser/order-breakdowns/${breakdownId}`, null, "DELETE");
     },
   },
 };

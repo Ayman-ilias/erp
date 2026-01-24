@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Edit, Trash2, Search, X, Shield } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, X, Shield, ChevronDown, ChevronRight, Eye, Pencil } from "lucide-react";
 import { ExportButton } from "@/components/export-button";
 import type { ExportColumn } from "@/lib/export-utils";
 import { Card } from "@/components/ui/card";
@@ -31,6 +31,12 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { DEPARTMENT_PAGES, type PageDefinition } from "@/lib/permissions";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
+
+// Type for page permissions: { departmentId: { pageKey: { read: boolean, write: boolean } } }
+type PagePermissions = Record<string, Record<string, { read: boolean; write: boolean }>>;
 
 const DEPARTMENTS = [
   { id: "client_info", label: "Client Info", description: "Access to Buyers, Suppliers, Contacts, Shipping, Banking" },
@@ -64,7 +70,9 @@ export default function UsersPage() {
     is_active: true,
     is_superuser: false,
     department_access: [] as string[],
+    page_permissions: {} as PagePermissions,
   });
+  const [expandedDepartments, setExpandedDepartments] = useState<string[]>([]);
 
   useEffect(() => {
     if (token && currentUser?.is_superuser) {
@@ -120,9 +128,18 @@ export default function UsersPage() {
         return;
       }
 
+      // Prepare the data to submit
       const dataToSubmit = {
-        ...formData,
+        username: formData.username,
+        email: formData.email,
         password: formData.password || undefined,
+        full_name: formData.full_name || undefined,
+        department: formData.department || undefined,
+        designation: formData.designation || undefined,
+        is_active: formData.is_active,
+        is_superuser: formData.is_superuser,
+        department_access: formData.department_access,
+        page_permissions: formData.page_permissions,
       };
 
       if (editingUser) {
@@ -134,7 +151,7 @@ export default function UsersPage() {
           return;
         }
         const createData = {
-          ...formData,
+          ...dataToSubmit,
           password: formData.password,
         };
         await api.users.create(createData, token);
@@ -161,7 +178,11 @@ export default function UsersPage() {
       is_active: user.is_active,
       is_superuser: user.is_superuser,
       department_access: user.department_access || [],
+      page_permissions: user.page_permissions || {},
     });
+    // Auto-expand departments that have pages selected
+    const deptIds = user.department_access || [];
+    setExpandedDepartments(deptIds);
     setIsDialogOpen(true);
   };
 
@@ -194,16 +215,90 @@ export default function UsersPage() {
       is_active: true,
       is_superuser: false,
       department_access: [],
+      page_permissions: {},
     });
+    setExpandedDepartments([]);
   };
 
   const toggleDepartmentAccess = (deptId: string) => {
-    setFormData({
-      ...formData,
-      department_access: formData.department_access.includes(deptId)
-        ? formData.department_access.filter((id) => id !== deptId)
-        : [...formData.department_access, deptId],
+    const isCurrentlySelected = formData.department_access.includes(deptId);
+
+    if (isCurrentlySelected) {
+      // Remove department and its page permissions
+      const newPagePermissions = { ...formData.page_permissions };
+      delete newPagePermissions[deptId];
+
+      setFormData({
+        ...formData,
+        department_access: formData.department_access.filter((id) => id !== deptId),
+        page_permissions: newPagePermissions,
+      });
+      setExpandedDepartments(expandedDepartments.filter((id) => id !== deptId));
+    } else {
+      // Add department and initialize all pages with read/write access
+      const deptPages = DEPARTMENT_PAGES[deptId as keyof typeof DEPARTMENT_PAGES] || [];
+      const newPagePermissions = { ...formData.page_permissions };
+      newPagePermissions[deptId] = {};
+      deptPages.forEach((page: PageDefinition) => {
+        newPagePermissions[deptId][page.key] = { read: true, write: true };
+      });
+
+      setFormData({
+        ...formData,
+        department_access: [...formData.department_access, deptId],
+        page_permissions: newPagePermissions,
+      });
+      setExpandedDepartments([...expandedDepartments, deptId]);
+    }
+  };
+
+  const toggleDepartmentExpanded = (deptId: string) => {
+    setExpandedDepartments(
+      expandedDepartments.includes(deptId)
+        ? expandedDepartments.filter((id) => id !== deptId)
+        : [...expandedDepartments, deptId]
+    );
+  };
+
+  const togglePagePermission = (deptId: string, pageKey: string, permType: 'read' | 'write') => {
+    const newPagePermissions = { ...formData.page_permissions };
+    if (!newPagePermissions[deptId]) {
+      newPagePermissions[deptId] = {};
+    }
+    if (!newPagePermissions[deptId][pageKey]) {
+      newPagePermissions[deptId][pageKey] = { read: false, write: false };
+    }
+
+    const currentValue = newPagePermissions[deptId][pageKey][permType];
+    newPagePermissions[deptId][pageKey][permType] = !currentValue;
+
+    // If turning off read, also turn off write
+    if (permType === 'read' && currentValue) {
+      newPagePermissions[deptId][pageKey].write = false;
+    }
+
+    // If turning on write, also ensure read is on
+    if (permType === 'write' && !currentValue) {
+      newPagePermissions[deptId][pageKey].read = true;
+    }
+
+    setFormData({ ...formData, page_permissions: newPagePermissions });
+  };
+
+  const setAllPagePermissions = (deptId: string, read: boolean, write: boolean) => {
+    const deptPages = DEPARTMENT_PAGES[deptId as keyof typeof DEPARTMENT_PAGES] || [];
+    const newPagePermissions = { ...formData.page_permissions };
+    if (!newPagePermissions[deptId]) {
+      newPagePermissions[deptId] = {};
+    }
+    deptPages.forEach((page: PageDefinition) => {
+      newPagePermissions[deptId][page.key] = { read, write: write && read };
     });
+    setFormData({ ...formData, page_permissions: newPagePermissions });
+  };
+
+  const getPagePermission = (deptId: string, pageKey: string, permType: 'read' | 'write'): boolean => {
+    return formData.page_permissions?.[deptId]?.[pageKey]?.[permType] ?? false;
   };
 
   const exportColumns: ExportColumn[] = [
@@ -400,41 +495,161 @@ export default function UsersPage() {
                   <div className="space-y-4 border-t pt-4">
                     <div>
                       <Label className="text-base font-semibold">
-                        Department Access Permissions *
+                        Department & Page Access Permissions *
                       </Label>
                       <p className="text-xs text-muted-foreground mb-3">
-                        Select which departments this user can access.
+                        Select departments and configure page-level read/write access for each page.
                       </p>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
-                      {DEPARTMENTS.map((dept) => (
-                        <div
-                          key={dept.id}
-                          className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50"
-                        >
-                          <Checkbox
-                            id={dept.id}
-                            checked={formData.department_access.includes(dept.id)}
-                            onCheckedChange={() => toggleDepartmentAccess(dept.id)}
-                            disabled={formData.is_superuser}
-                          />
-                          <div className="flex-1">
-                            <Label
-                              htmlFor={dept.id}
-                              className="cursor-pointer font-medium"
+                      {DEPARTMENTS.map((dept) => {
+                        const isSelected = formData.department_access.includes(dept.id);
+                        const isExpanded = expandedDepartments.includes(dept.id);
+                        const deptPages = DEPARTMENT_PAGES[dept.id as keyof typeof DEPARTMENT_PAGES] || [];
+
+                        return (
+                          <div
+                            key={dept.id}
+                            className="border rounded-lg overflow-hidden"
+                          >
+                            {/* Department Header */}
+                            <div
+                              className={`flex items-center space-x-3 p-3 ${isSelected ? 'bg-primary/5' : 'hover:bg-muted/50'}`}
                             >
-                              {dept.label}
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              {dept.description}
-                            </p>
+                              <Checkbox
+                                id={dept.id}
+                                checked={isSelected}
+                                onCheckedChange={() => toggleDepartmentAccess(dept.id)}
+                                disabled={formData.is_superuser}
+                              />
+                              <div className="flex-1">
+                                <Label
+                                  htmlFor={dept.id}
+                                  className="cursor-pointer font-medium"
+                                >
+                                  {dept.label}
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                  {dept.description}
+                                </p>
+                              </div>
+                              {isSelected && deptPages.length > 0 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleDepartmentExpanded(dept.id)}
+                                  className="ml-auto"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span className="ml-1 text-xs">
+                                    {deptPages.length} pages
+                                  </span>
+                                </Button>
+                              )}
+                            </div>
+
+                            {/* Page Permissions (Collapsible) */}
+                            {isSelected && isExpanded && deptPages.length > 0 && (
+                              <div className="border-t bg-muted/30 p-3 space-y-2">
+                                {/* Quick Actions */}
+                                <div className="flex items-center justify-between pb-2 border-b mb-2">
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    Page Permissions
+                                  </span>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={() => setAllPagePermissions(dept.id, true, true)}
+                                    >
+                                      All Read+Write
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={() => setAllPagePermissions(dept.id, true, false)}
+                                    >
+                                      All Read Only
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={() => setAllPagePermissions(dept.id, false, false)}
+                                    >
+                                      None
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Page List */}
+                                <div className="space-y-1">
+                                  {deptPages.map((page: PageDefinition) => {
+                                    const hasRead = getPagePermission(dept.id, page.key, 'read');
+                                    const hasWrite = getPagePermission(dept.id, page.key, 'write');
+
+                                    return (
+                                      <div
+                                        key={page.key}
+                                        className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50"
+                                      >
+                                        <span className="text-sm">{page.label}</span>
+                                        <div className="flex items-center gap-3">
+                                          {/* Read Permission */}
+                                          <div className="flex items-center gap-1.5">
+                                            <Eye className={`h-3.5 w-3.5 ${hasRead ? 'text-green-600' : 'text-muted-foreground'}`} />
+                                            <Switch
+                                              checked={hasRead}
+                                              onCheckedChange={() => togglePagePermission(dept.id, page.key, 'read')}
+                                              className="h-4 w-7"
+                                            />
+                                          </div>
+                                          {/* Write Permission */}
+                                          <div className="flex items-center gap-1.5">
+                                            <Pencil className={`h-3.5 w-3.5 ${hasWrite ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                                            <Switch
+                                              checked={hasWrite}
+                                              onCheckedChange={() => togglePagePermission(dept.id, page.key, 'write')}
+                                              disabled={!hasRead}
+                                              className="h-4 w-7"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Legend */}
+                                <div className="flex items-center gap-4 pt-2 border-t text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    <Eye className="h-3 w-3" />
+                                    <span>Read (View)</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Pencil className="h-3 w-3" />
+                                    <span>Write (Edit/Create/Delete)</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     {formData.is_superuser && (
                       <p className="text-xs text-muted-foreground italic">
-                        Administrators have access to all departments automatically.
+                        Administrators have full access to all departments and pages automatically.
                       </p>
                     )}
                   </div>

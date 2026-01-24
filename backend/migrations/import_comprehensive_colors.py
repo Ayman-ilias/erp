@@ -1,6 +1,6 @@
 """
-Migration: Import Comprehensive Color Data - Fixed Version
-==========================================================
+Migration: Import Comprehensive Color Data
+==========================================
 
 This migration automatically imports:
 1. H&M colors from Excel file (if available)

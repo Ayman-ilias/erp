@@ -22,7 +22,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusIcon, Pencil, Trash2, Search, X } from "lucide-react";
+import { PlusIcon, Pencil, Trash2, Search, X, Check, ChevronsUpDown, Eye } from "lucide-react";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ExportButton } from "@/components/export-button";
 import type { ExportColumn } from "@/lib/export-utils";
 import {
@@ -32,7 +34,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { countries } from "@/lib/countries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PermissionGuard } from "@/components/permission-guard";
@@ -73,7 +90,31 @@ const initialFormData: SupplierFormData = {
   rating: 0,
 };
 
+// Default supplier types
+const DEFAULT_SUPPLIER_TYPES = [
+  "Fabric",
+  "Trims",
+  "Accessories",
+  "Packaging",
+  "Yarn",
+  "Chemicals",
+  "Labels",
+  "Buttons",
+  "Zippers",
+  "Thread",
+  "Elastic",
+  "Interlining",
+  "Hangtags",
+  "Cartons",
+  "Polybags",
+];
+
 export default function SuppliersPage() {
+  // ============================================================================
+  // PAGE PERMISSIONS: Check read/write access for this page
+  // ============================================================================
+  const { canWrite, canRead } = usePagePermissions();
+
   // ============================================================================
   // TANSTACK QUERY: Data fetching with caching, auto-refetch, loading states
   // ============================================================================
@@ -99,6 +140,9 @@ export default function SuppliersPage() {
     rating: "",
   });
   const [formData, setFormData] = useState<SupplierFormData>(initialFormData);
+  const [supplierTypeOpen, setSupplierTypeOpen] = useState(false);
+  const [newSupplierType, setNewSupplierType] = useState("");
+  const [customSupplierTypes, setCustomSupplierTypes] = useState<string[]>([]);
 
   // ============================================================================
   // DERIVED STATE: Using useMemo instead of useEffect + useState
@@ -153,7 +197,25 @@ export default function SuppliersPage() {
     [suppliers]
   );
 
+  // All available supplier types (default + custom + from existing suppliers)
+  const allSupplierTypes = useMemo(() => {
+    const fromSuppliers = suppliers.map((s) => s.supplier_type).filter(Boolean) as string[];
+    return unique([...DEFAULT_SUPPLIER_TYPES, ...customSupplierTypes, ...fromSuppliers]).sort();
+  }, [suppliers, customSupplierTypes]);
+
   const clearFilters = () => setFilters({ search: "", type: "", country: "", rating: "" });
+
+  // Handle adding new supplier type
+  const handleAddNewSupplierType = () => {
+    if (newSupplierType.trim() && !allSupplierTypes.includes(newSupplierType.trim())) {
+      const newType = newSupplierType.trim();
+      setCustomSupplierTypes([...customSupplierTypes, newType]);
+      setFormData({ ...formData, supplier_type: newType });
+      setNewSupplierType("");
+      setSupplierTypeOpen(false);
+      toast.success(`Added new supplier type: ${newType}`);
+    }
+  };
 
   // ============================================================================
   // HANDLERS: Using TanStack Query mutations
@@ -287,6 +349,15 @@ export default function SuppliersPage() {
   return (
     <PermissionGuard requiredDepartment="client_info">
       <div className="flex flex-col gap-6">
+        {/* Read-only mode banner */}
+        {!canWrite && canRead && (
+          <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+            <Eye className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              You have <strong>read-only</strong> access to this page. Contact your administrator for edit permissions.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Supplier Info</h1>
@@ -301,7 +372,11 @@ export default function SuppliersPage() {
               filename="suppliers"
               sheetName="Suppliers"
             />
-            <Button onClick={() => setIsDialogOpen(true)}>
+            <Button
+              onClick={() => setIsDialogOpen(true)}
+              disabled={!canWrite}
+              title={!canWrite ? "You don't have write permission" : undefined}
+            >
               <PlusIcon className="mr-2 h-4 w-4" />
               Add Supplier
             </Button>
@@ -437,6 +512,8 @@ export default function SuppliersPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEdit(supplier)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -444,6 +521,8 @@ export default function SuppliersPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(supplier.id)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -490,51 +569,124 @@ export default function SuppliersPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="supplier_type">Supplier Type *</Label>
-                  <Select
-                    value={formData.supplier_type}
-                    onValueChange={(value) => setFormData({ ...formData, supplier_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fabric">Fabric</SelectItem>
-                      <SelectItem value="Trims">Trims</SelectItem>
-                      <SelectItem value="Accessories">Accessories</SelectItem>
-                      <SelectItem value="Packaging">Packaging</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={supplierTypeOpen} onOpenChange={setSupplierTypeOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={supplierTypeOpen}
+                        className="w-full justify-between"
+                      >
+                        {formData.supplier_type || "Select type..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search supplier type..." />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="p-2 text-center text-sm">
+                              <p className="text-muted-foreground">No type found.</p>
+                              <div className="mt-2 flex gap-2">
+                                <Input
+                                  placeholder="Add new type..."
+                                  value={newSupplierType}
+                                  onChange={(e) => setNewSupplierType(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleAddNewSupplierType();
+                                    }
+                                  }}
+                                  className="h-8"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={handleAddNewSupplierType}
+                                  disabled={!newSupplierType.trim()}
+                                >
+                                  <PlusIcon className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {allSupplierTypes.map((type) => (
+                              <CommandItem
+                                key={type}
+                                value={type}
+                                onSelect={() => {
+                                  setFormData({ ...formData, supplier_type: type });
+                                  setSupplierTypeOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.supplier_type === type ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {type}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          <CommandSeparator />
+                          <CommandGroup heading="Add New">
+                            <div className="p-2 flex gap-2">
+                              <Input
+                                placeholder="New type name..."
+                                value={newSupplierType}
+                                onChange={(e) => setNewSupplierType(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleAddNewSupplierType();
+                                  }
+                                }}
+                                className="h-8"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={handleAddNewSupplierType}
+                                disabled={!newSupplierType.trim()}
+                              >
+                                <PlusIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="contact_person">Contact Person *</Label>
+                  <Label htmlFor="contact_person">Contact Person</Label>
                   <Input
                     id="contact_person"
                     value={formData.contact_person}
                     onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone *</Label>
+                  <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country *</Label>
+                  <Label htmlFor="country">Country</Label>
                   <Select
                     value={formData.country}
                     onValueChange={(value) => setFormData({ ...formData, country: value })}

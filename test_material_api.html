@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Material Details API Test</h1>
+    
+    <div class="section">
+        <h2>Yarn API Test</h2>
+        <button onclick="testYarnAPI()">Test Yarn API</button>
+        <div id="yarn-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Fabric API Test</h2>
+        <button onclick="testFabricAPI()">Test Fabric API</button>
+        <div id="fabric-result"></div>
+    </div>
+
+    <script>
+        async function testYarnAPI() {
+            const resultDiv = document.getElementById('yarn-result');
+            resultDiv.innerHTML = '<p>Testing yarn API...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/merchandiser/yarn');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Yarn API working! Found ${data.length} yarn records</p>
+                    <pre>${JSON.stringify(data.slice(0, 2), null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Yarn API failed: ${error.message}</p>`;
+            }
+        }
+
+        async function testFabricAPI() {
+            const resultDiv = document.getElementById('fabric-result');
+            resultDiv.innerHTML = '<p>Testing fabric API...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/merchandiser/fabric');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Fabric API working! Found ${data.length} fabric records</p>
+                    <pre>${JSON.stringify(data.slice(0, 2), null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Fabric API failed: ${error.message}</p>`;
+            }
+        }
+
+        // Auto-test on page load
+        window.onload = function() {
+            testYarnAPI();
+            testFabricAPI();
+        };
+    </script>
+</body>
+</html>

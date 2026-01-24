@@ -18,13 +18,24 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowLeft, Loader2, Upload, FileText, Check, ChevronsUpDown, Plus, X, Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Loader2, Upload, FileText, Check, ChevronsUpDown, Plus, X, Trash2, PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SimpleColorSelector, type SimpleSelectedColor } from "@/components/sizecolor/SimpleColorSelector";
 import { SimpleSizeSelector, type SimpleSelectedSize } from "@/components/sizecolor/SimpleSizeSelector";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ShieldX } from "lucide-react";
 
 const DEFAULT_SAMPLE_CATEGORIES = ["Proto", "Fit", "PP", "SMS", "TOP", "Salesman", "Photo Shoot", "Production"];
 
@@ -44,6 +55,9 @@ export default function AddSampleRequestPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
+
+  // Check page permissions - this is a write-only page (create/edit)
+  const { canWrite, canRead } = usePagePermissions();
 
   // Check if we're editing (via URL query param)
   const editSampleId = searchParams.get("edit");
@@ -239,6 +253,22 @@ export default function AddSampleRequestPage() {
   const [yarnOpen, setYarnOpen] = useState(false);
   const [trimsOpen, setTrimsOpen] = useState(false);
 
+  // State for creating new yarn from this form
+  const [createYarnDialogOpen, setCreateYarnDialogOpen] = useState(false);
+  const [newYarnData, setNewYarnData] = useState({
+    yarn_id: "",
+    yarn_name: "",
+    yarn_composition: "",
+    yarn_count: "",
+    count_system: "Ne",
+    yarn_type: "",
+    yarn_form: "",
+    yarn_finish: "",
+    color: "",
+    dye_type: "",
+    remarks: "",
+  });
+
   // Mutation for creating sample
   const createPrimaryMutation = useMutation({
     mutationFn: (data: any) => api.merchandiser.samplePrimary.create(data),
@@ -295,6 +325,60 @@ export default function AddSampleRequestPage() {
       toast.error(`Failed to update sample: ${error.message}`);
     },
   });
+
+  // Create yarn mutation - for creating new yarn from this form
+  const createYarnMutation = useMutation({
+    mutationFn: (data: any) => api.merchandiser.yarn.create(data),
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["merchandiser", "yarn"] });
+      toast.success("Yarn created successfully and added to selection");
+      // Auto-select the newly created yarn
+      if (response?.yarn_id) {
+        setFormData((prev) => ({
+          ...prev,
+          yarn_ids: [...prev.yarn_ids, response.yarn_id],
+        }));
+      }
+      setCreateYarnDialogOpen(false);
+      // Reset form
+      setNewYarnData({
+        yarn_id: "",
+        yarn_name: "",
+        yarn_composition: "",
+        yarn_count: "",
+        count_system: "Ne",
+        yarn_type: "",
+        yarn_form: "",
+        yarn_finish: "",
+        color: "",
+        dye_type: "",
+        remarks: "",
+      });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to create yarn: ${error.message || "Unknown error"}`);
+    },
+  });
+
+  // Generate yarn ID based on composition and count
+  const generateYarnId = (composition: string, count: string): string => {
+    if (!composition) return "";
+    const compPart = composition
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "_")
+      .substring(0, 20);
+    const countPart = count ? `_${count.replace(/[^A-Z0-9]/gi, "")}` : "";
+    const timestamp = Date.now().toString().slice(-4);
+    return `YRN_${compPart}${countPart}_${timestamp}`;
+  };
+
+  // Auto-generate yarn ID when composition/count changes
+  useEffect(() => {
+    if (newYarnData.yarn_composition || newYarnData.yarn_count) {
+      const generatedId = generateYarnId(newYarnData.yarn_composition, newYarnData.yarn_count);
+      setNewYarnData((prev) => ({ ...prev, yarn_id: generatedId }));
+    }
+  }, [newYarnData.yarn_composition, newYarnData.yarn_count]);
 
   const filteredBuyers = useMemo(() => {
     if (!buyerSearch || !buyersData) return buyersData || [];
@@ -624,6 +708,36 @@ export default function AddSampleRequestPage() {
       </div>
     </div>
   );
+
+  // Access denied for users without write permission (this is a create/edit page)
+  if (!canWrite) {
+    return (
+      <div className="min-h-screen bg-muted/30 py-8">
+        <div className="container mx-auto px-6 max-w-[1800px]">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/dashboard/erp/merchandising/sample-development")}
+            className="mb-6"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Sample Development
+          </Button>
+          <Card className="shadow-lg">
+            <CardContent className="p-8">
+              <Alert className="border-destructive bg-destructive/10">
+                <ShieldX className="h-5 w-5 text-destructive" />
+                <AlertTitle className="text-destructive">Access Denied</AlertTitle>
+                <AlertDescription className="text-destructive/80">
+                  You don&apos;t have permission to create or edit sample requests.
+                  Contact your administrator to request write access.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30 py-8">
@@ -977,7 +1091,19 @@ export default function AddSampleRequestPage() {
                 <h3 className="text-lg font-semibold border-b pb-2">Materials</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Yarn ID</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Yarn ID</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs text-primary hover:text-primary/80"
+                        onClick={() => setCreateYarnDialogOpen(true)}
+                      >
+                        <PlusCircle className="mr-1 h-3 w-3" />
+                        Create New Yarn
+                      </Button>
+                    </div>
                     <Popover open={yarnOpen} onOpenChange={setYarnOpen}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" role="combobox" className="w-full justify-between h-11">
@@ -1570,6 +1696,198 @@ export default function AddSampleRequestPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* CREATE NEW YARN DIALOG */}
+      <Dialog open={createYarnDialogOpen} onOpenChange={setCreateYarnDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Yarn</DialogTitle>
+            <DialogDescription>
+              Add a new yarn to the database. It will automatically be added to Material Details and selected in this form.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_id">Yarn ID (Auto-generated)</Label>
+                <Input
+                  id="new_yarn_id"
+                  value={newYarnData.yarn_id}
+                  onChange={(e) => setNewYarnData({ ...newYarnData, yarn_id: e.target.value })}
+                  placeholder="Will be auto-generated"
+                  disabled
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_name">
+                  Yarn Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="new_yarn_name"
+                  value={newYarnData.yarn_name}
+                  onChange={(e) => setNewYarnData({ ...newYarnData, yarn_name: e.target.value })}
+                  placeholder="e.g., 100% Cotton Yarn"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_composition">
+                  Yarn Composition <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="new_yarn_composition"
+                  value={newYarnData.yarn_composition}
+                  onChange={(e) => setNewYarnData({ ...newYarnData, yarn_composition: e.target.value })}
+                  placeholder="e.g., 100% Cotton, 60/40 Cotton/Polyester"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_count">Yarn Count</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="new_yarn_count"
+                    value={newYarnData.yarn_count}
+                    onChange={(e) => setNewYarnData({ ...newYarnData, yarn_count: e.target.value })}
+                    placeholder="e.g., 30/1"
+                    className="flex-1"
+                  />
+                  <Select
+                    value={newYarnData.count_system}
+                    onValueChange={(value) => setNewYarnData({ ...newYarnData, count_system: value })}
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ne">Ne</SelectItem>
+                      <SelectItem value="Nm">Nm</SelectItem>
+                      <SelectItem value="Tex">Tex</SelectItem>
+                      <SelectItem value="Denier">Denier</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_type">Yarn Type</Label>
+                <Select
+                  value={newYarnData.yarn_type}
+                  onValueChange={(value) => setNewYarnData({ ...newYarnData, yarn_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ring Spun">Ring Spun</SelectItem>
+                    <SelectItem value="Open End">Open End</SelectItem>
+                    <SelectItem value="Compact">Compact</SelectItem>
+                    <SelectItem value="Carded">Carded</SelectItem>
+                    <SelectItem value="Combed">Combed</SelectItem>
+                    <SelectItem value="Slub">Slub</SelectItem>
+                    <SelectItem value="Melange">Melange</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_form">Yarn Form</Label>
+                <Select
+                  value={newYarnData.yarn_form}
+                  onValueChange={(value) => setNewYarnData({ ...newYarnData, yarn_form: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select form..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cone">Cone</SelectItem>
+                    <SelectItem value="Hank">Hank</SelectItem>
+                    <SelectItem value="Package">Package</SelectItem>
+                    <SelectItem value="Spool">Spool</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_finish">Yarn Finish</Label>
+                <Input
+                  id="new_yarn_finish"
+                  value={newYarnData.yarn_finish}
+                  onChange={(e) => setNewYarnData({ ...newYarnData, yarn_finish: e.target.value })}
+                  placeholder="e.g., Mercerized, Bio-washed"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_yarn_color">Color</Label>
+                <Input
+                  id="new_yarn_color"
+                  value={newYarnData.color}
+                  onChange={(e) => setNewYarnData({ ...newYarnData, color: e.target.value })}
+                  placeholder="e.g., Raw White, Dyed"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_dye_type">Dye Type</Label>
+                <Select
+                  value={newYarnData.dye_type}
+                  onValueChange={(value) => setNewYarnData({ ...newYarnData, dye_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select dye type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Reactive">Reactive</SelectItem>
+                    <SelectItem value="Disperse">Disperse</SelectItem>
+                    <SelectItem value="VAT">VAT</SelectItem>
+                    <SelectItem value="Sulphur">Sulphur</SelectItem>
+                    <SelectItem value="Pigment">Pigment</SelectItem>
+                    <SelectItem value="None">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new_yarn_remarks">Remarks</Label>
+              <Textarea
+                id="new_yarn_remarks"
+                value={newYarnData.remarks}
+                onChange={(e) => setNewYarnData({ ...newYarnData, remarks: e.target.value })}
+                placeholder="Additional notes..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreateYarnDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={createYarnMutation.isPending || !newYarnData.yarn_name || !newYarnData.yarn_composition}
+              onClick={() => {
+                if (!newYarnData.yarn_name || !newYarnData.yarn_composition) {
+                  toast.error("Please fill in Yarn Name and Composition");
+                  return;
+                }
+                createYarnMutation.mutate(newYarnData);
+              }}
+            >
+              {createYarnMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Yarn
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -25,6 +25,10 @@ async function proxyRequest(request: NextRequest, path: string[]) {
     request.headers.forEach((value, key) => {
       // Skip host header and other headers that shouldn't be forwarded
       if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
+        // Skip Authorization header for merchandiser endpoints (they don't require auth)
+        if (key.toLowerCase() === 'authorization' && path[0] === 'merchandiser') {
+          return;
+        }
         headers[key] = value;
       }
     });

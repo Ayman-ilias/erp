@@ -59,7 +59,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
-import { isMenuItemVisible, MENU_TO_DEPARTMENT, hasDepartmentAccess } from "@/lib/permissions";
+import { isMenuItemVisible, MENU_TO_DEPARTMENT, hasDepartmentAccess, canAccessSettingsItem, hasPageAccessByRoute, DEPARTMENT_PAGES, type DepartmentId } from "@/lib/permissions";
 
 /**
  * Navigation items configuration
@@ -172,33 +172,11 @@ export const navItems: NavGroup[] = [
             title: "Style Management",
             href: "/dashboard/erp/merchandising/style-management",
             icon: PaletteIcon
-          }
-        ]
-      },
-      {
-        title: "Order Info",
-        href: "#",
-        icon: FolderDotIcon,
-        items: [
+          },
           {
-            title: "Orders",
-            href: "/dashboard/erp/orders",
+            title: "Order Management",
+            href: "/dashboard/erp/merchandising/order-management",
             icon: FolderDotIcon
-          },
-          {
-            title: "Production Planning",
-            href: "/dashboard/erp/production",
-            icon: CalendarIcon
-          },
-          {
-            title: "Store & Inventory",
-            href: "/dashboard/erp/inventory",
-            icon: ArchiveRestoreIcon
-          },
-          {
-            title: "Reports",
-            href: "/dashboard/erp/reports",
-            icon: ChartPieIcon
           }
         ]
       },
@@ -310,6 +288,27 @@ export function NavMain() {
       ...nav,
       items: nav.items
         .map((item) => {
+          // Special handling for Basic Settings - allow non-admin access to specific items
+          if (item.title === "Basic Settings" && item.isAdminOnly && !user.is_superuser) {
+            // Filter Basic Settings sub-items based on department-specific access
+            if (item.items && Array.isArray(item.items)) {
+              const accessibleItems = item.items.filter((subItem) =>
+                canAccessSettingsItem(user, subItem.title)
+              );
+
+              // If user has access to any settings items, show the menu with only those items
+              if (accessibleItems.length > 0) {
+                return {
+                  ...item,
+                  isAdminOnly: false, // Override admin-only for this filtered version
+                  items: accessibleItems
+                };
+              }
+            }
+            // No accessible items, hide the menu
+            return null;
+          }
+
           // Check if user has access to this menu item
           if (!isMenuItemVisible(user, item.title, item.isAdminOnly)) {
             return null;
@@ -317,8 +316,15 @@ export function NavMain() {
 
           // For items with sub-items (dropdown menus)
           if (item.items && Array.isArray(item.items)) {
-            // Filter sub-items based on their specific department access
+            // Filter sub-items based on page-level permissions
             const filteredSubItems = item.items.filter((subItem) => {
+              // Check page-level access using the route
+              if (subItem.href && subItem.href !== "#") {
+                // Use hasPageAccessByRoute which checks page_permissions
+                const hasAccess = hasPageAccessByRoute(user, subItem.href, false); // false = check read access
+                return hasAccess;
+              }
+
               // Get department for sub-item if it has specific routing
               const subDeptId = MENU_TO_DEPARTMENT[subItem.title];
               if (subDeptId) {

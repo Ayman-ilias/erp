@@ -42,6 +42,14 @@ import { InlineConverter } from "@/components/uom/InlineConverter";
 import { UnitDisplay } from "@/components/uom/UnitDisplay";
 import { SearchableDropdown } from "@/components/ui/searchable-dropdown";
 import { cn } from "@/lib/utils";
+import {
+  YarnCompositionEditor,
+  formatCompositionDisplay,
+  type YarnCompositionData,
+} from "@/components/yarn/YarnCompositionEditor";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye } from "lucide-react";
 
 // Helper function to generate product ID: PRODUCTNAME_CAT_0001
 // Serial number is global and always incrementing (not dependent on name/category)
@@ -90,20 +98,26 @@ export default function MaterialDetailsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("yarn");
+
+  // Page permissions - check if user has write access
+  const { canWrite, canRead } = usePagePermissions();
   
   // Dialog states
   const [yarnDialogOpen, setYarnDialogOpen] = useState(false);
   const [fabricDialogOpen, setFabricDialogOpen] = useState(false);
   const [trimsDialogOpen, setTrimsDialogOpen] = useState(false);
   const [accessoriesDialogOpen, setAccessoriesDialogOpen] = useState(false);
+  const [trimsAccessoriesDialogOpen, setTrimsAccessoriesDialogOpen] = useState(false);
+  const [trimsAccessoriesType, setTrimsAccessoriesType] = useState<"trims" | "accessories">("trims");
   const [finishedGoodDialogOpen, setFinishedGoodDialogOpen] = useState(false);
   const [packingGoodDialogOpen, setPackingGoodDialogOpen] = useState(false);
-  
+
   // Editing states
   const [editingYarn, setEditingYarn] = useState<any>(null);
   const [editingFabric, setEditingFabric] = useState<any>(null);
   const [editingTrims, setEditingTrims] = useState<any>(null);
   const [editingAccessories, setEditingAccessories] = useState<any>(null);
+  const [editingTrimsAccessories, setEditingTrimsAccessories] = useState<any>(null);
   const [editingFinishedGood, setEditingFinishedGood] = useState<any>(null);
   const [editingPackingGood, setEditingPackingGood] = useState<any>(null);
 
@@ -373,6 +387,16 @@ export default function MaterialDetailsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Read-only mode banner */}
+      {!canWrite && canRead && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+          <Eye className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400">
+            You have <strong>read-only</strong> access to this page. Contact your administrator for edit permissions.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <Button
@@ -391,7 +415,7 @@ export default function MaterialDetailsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="yarn">
             Yarn
             {yarnData && (
@@ -408,19 +432,11 @@ export default function MaterialDetailsPage() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="trims">
-            Trims
-            {trimsData && (
+          <TabsTrigger value="trimsAccessories">
+            Trims & Accessories
+            {(trimsData || accessoriesData) && (
               <Badge variant="secondary" className="ml-2">
-                {trimsData.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="accessories">
-            Accessories
-            {accessoriesData && (
-              <Badge variant="secondary" className="ml-2">
-                {accessoriesData.length}
+                {(trimsData?.length || 0) + (accessoriesData?.length || 0)}
               </Badge>
             )}
           </TabsTrigger>
@@ -458,6 +474,8 @@ export default function MaterialDetailsPage() {
                     setEditingYarn(null);
                     setYarnDialogOpen(true);
                   }}
+                  disabled={!canWrite}
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Yarn
@@ -503,6 +521,7 @@ export default function MaterialDetailsPage() {
                               setEditingYarn(yarn);
                               setYarnDialogOpen(true);
                             }}
+                            disabled={!canWrite}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -510,6 +529,7 @@ export default function MaterialDetailsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteYarn(yarn.yarn_id)}
+                            disabled={!canWrite}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -543,6 +563,8 @@ export default function MaterialDetailsPage() {
                     setEditingFabric(null);
                     setFabricDialogOpen(true);
                   }}
+                  disabled={!canWrite}
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Fabric
@@ -603,6 +625,7 @@ export default function MaterialDetailsPage() {
                               setEditingFabric(fabric);
                               setFabricDialogOpen(true);
                             }}
+                            disabled={!canWrite}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -610,6 +633,7 @@ export default function MaterialDetailsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteFabric(fabric.fabric_id)}
+                            disabled={!canWrite}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -627,37 +651,56 @@ export default function MaterialDetailsPage() {
           </Card>
         </TabsContent>
 
-        {/* TRIMS TAB */}
-        <TabsContent value="trims">
+        {/* TRIMS & ACCESSORIES TAB (MERGED) */}
+        <TabsContent value="trimsAccessories">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Trims Details</CardTitle>
+                  <CardTitle>Trims & Accessories Details</CardTitle>
                   <CardDescription>
-                    View and manage trims (buttons, zippers, etc.)
+                    View and manage trims (buttons, zippers, etc.) and accessories (labels, tags, etc.)
                   </CardDescription>
                 </div>
-                <Button
-                  onClick={() => {
-                    setEditingTrims(null);
-                    setTrimsDialogOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Trims
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingTrimsAccessories(null);
+                      setTrimsAccessoriesType("trims");
+                      setTrimsAccessoriesDialogOpen(true);
+                    }}
+                    disabled={!canWrite}
+                    title={!canWrite ? "You don't have write permission" : undefined}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Trims
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setEditingTrimsAccessories(null);
+                      setTrimsAccessoriesType("accessories");
+                      setTrimsAccessoriesDialogOpen(true);
+                    }}
+                    disabled={!canWrite}
+                    title={!canWrite ? "You don't have write permission" : undefined}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Accessories
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              {trimsLoading ? (
+              {(trimsLoading || accessoriesLoading) ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              ) : trimsData && trimsData.length > 0 ? (
+              ) : ((trimsData && trimsData.length > 0) || (accessoriesData && accessoriesData.length > 0)) ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Type</TableHead>
                       <TableHead>Product ID</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Category</TableHead>
@@ -668,32 +711,36 @@ export default function MaterialDetailsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {trimsData.map((trims: any) => (
-                      <TableRow key={trims.id}>
-                        <TableCell className="font-medium">{trims.product_id}</TableCell>
-                        <TableCell>{trims.product_name}</TableCell>
+                    {/* Trims items */}
+                    {trimsData?.map((item: any) => (
+                      <TableRow key={`trims-${item.id}`}>
                         <TableCell>
-                          <Badge variant="secondary">{trims.category || "-"}</Badge>
+                          <Badge variant="default">Trims</Badge>
                         </TableCell>
-                        <TableCell>{trims.sub_category || "-"}</TableCell>
+                        <TableCell className="font-medium">{item.product_id}</TableCell>
+                        <TableCell>{item.product_name}</TableCell>
                         <TableCell>
-                          {trims.unit_id ? (
-                            <UnitDisplay 
-                              unitId={trims.unit_id} 
+                          <Badge variant="secondary">{item.category || "-"}</Badge>
+                        </TableCell>
+                        <TableCell>{item.sub_category || "-"}</TableCell>
+                        <TableCell>
+                          {item.unit_id ? (
+                            <UnitDisplay
+                              unitId={item.unit_id}
                               showFullName={false}
                               showUnitType={false}
                             />
                           ) : (
-                            trims.uom || "-"
+                            item.uom || "-"
                           )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={
-                            trims.consumable_flag === "yes" || trims.consumable_flag === true ? "default" :
-                            trims.consumable_flag === "no" || trims.consumable_flag === false ? "secondary" : "outline"
+                            item.consumable_flag === "yes" || item.consumable_flag === true ? "default" :
+                            item.consumable_flag === "no" || item.consumable_flag === false ? "secondary" : "outline"
                           }>
-                            {trims.consumable_flag === "yes" || trims.consumable_flag === true ? "Yes" :
-                             trims.consumable_flag === "no" || trims.consumable_flag === false ? "No" : "None"}
+                            {item.consumable_flag === "yes" || item.consumable_flag === true ? "Yes" :
+                             item.consumable_flag === "no" || item.consumable_flag === false ? "No" : "None"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-2">
@@ -701,16 +748,75 @@ export default function MaterialDetailsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              setEditingTrims(trims);
-                              setTrimsDialogOpen(true);
+                              setEditingTrimsAccessories({ ...item, _type: "trims" });
+                              setTrimsAccessoriesType("trims");
+                              setTrimsAccessoriesDialogOpen(true);
                             }}
+                            disabled={!canWrite}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteTrims(trims.product_id)}
+                            onClick={() => handleDeleteTrims(item.product_id)}
+                            disabled={!canWrite}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Accessories items */}
+                    {accessoriesData?.map((item: any) => (
+                      <TableRow key={`acc-${item.id}`}>
+                        <TableCell>
+                          <Badge variant="secondary">Accessories</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{item.product_id}</TableCell>
+                        <TableCell>{item.product_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{item.category || "-"}</Badge>
+                        </TableCell>
+                        <TableCell>{item.sub_category || "-"}</TableCell>
+                        <TableCell>
+                          {item.unit_id ? (
+                            <UnitDisplay
+                              unitId={item.unit_id}
+                              showFullName={false}
+                              showUnitType={false}
+                            />
+                          ) : (
+                            item.uom || "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            item.consumable_flag === "yes" || item.consumable_flag === true ? "default" :
+                            item.consumable_flag === "no" || item.consumable_flag === false ? "secondary" : "outline"
+                          }>
+                            {item.consumable_flag === "yes" || item.consumable_flag === true ? "Yes" :
+                             item.consumable_flag === "no" || item.consumable_flag === false ? "No" : "None"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingTrimsAccessories({ ...item, _type: "accessories" });
+                              setTrimsAccessoriesType("accessories");
+                              setTrimsAccessoriesDialogOpen(true);
+                            }}
+                            disabled={!canWrite}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAccessories(item.product_id)}
+                            disabled={!canWrite}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -721,108 +827,7 @@ export default function MaterialDetailsPage() {
                 </Table>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  No trims records found. Click "Add Trims" to create one.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ACCESSORIES TAB */}
-        <TabsContent value="accessories">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Accessories Details</CardTitle>
-                  <CardDescription>
-                    View and manage accessories (labels, tags, etc.)
-                  </CardDescription>
-                </div>
-                <Button
-                  onClick={() => {
-                    setEditingAccessories(null);
-                    setAccessoriesDialogOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Accessories
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {accessoriesLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : accessoriesData && accessoriesData.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product ID</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Sub-Category</TableHead>
-                      <TableHead>UoM</TableHead>
-                      <TableHead>Consumable</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {accessoriesData.map((accessory: any) => (
-                      <TableRow key={accessory.id}>
-                        <TableCell className="font-medium">{accessory.product_id}</TableCell>
-                        <TableCell>{accessory.product_name}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{accessory.category || "-"}</Badge>
-                        </TableCell>
-                        <TableCell>{accessory.sub_category || "-"}</TableCell>
-                        <TableCell>
-                          {accessory.unit_id ? (
-                            <UnitDisplay 
-                              unitId={accessory.unit_id} 
-                              showFullName={false}
-                              showUnitType={false}
-                            />
-                          ) : (
-                            accessory.uom || "-"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            accessory.consumable_flag === "yes" || accessory.consumable_flag === true ? "default" :
-                            accessory.consumable_flag === "no" || accessory.consumable_flag === false ? "secondary" : "outline"
-                          }>
-                            {accessory.consumable_flag === "yes" || accessory.consumable_flag === true ? "Yes" :
-                             accessory.consumable_flag === "no" || accessory.consumable_flag === false ? "No" : "None"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingAccessories(accessory);
-                              setAccessoriesDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteAccessories(accessory.product_id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No accessories records found. Click "Add Accessories" to create one.
+                  No trims or accessories records found. Click "Add Trims" or "Add Accessories" to create one.
                 </div>
               )}
             </CardContent>
@@ -845,6 +850,8 @@ export default function MaterialDetailsPage() {
                     setEditingFinishedGood(null);
                     setFinishedGoodDialogOpen(true);
                   }}
+                  disabled={!canWrite}
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Finished Good
@@ -906,6 +913,8 @@ export default function MaterialDetailsPage() {
                               setEditingFinishedGood(item);
                               setFinishedGoodDialogOpen(true);
                             }}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -913,6 +922,8 @@ export default function MaterialDetailsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteFinishedGood(item.product_id)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -946,6 +957,8 @@ export default function MaterialDetailsPage() {
                     setEditingPackingGood(null);
                     setPackingGoodDialogOpen(true);
                   }}
+                  disabled={!canWrite}
+                  title={!canWrite ? "You don't have write permission" : undefined}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Packing Good
@@ -1007,6 +1020,8 @@ export default function MaterialDetailsPage() {
                               setEditingPackingGood(item);
                               setPackingGoodDialogOpen(true);
                             }}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -1014,6 +1029,8 @@ export default function MaterialDetailsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeletePackingGood(item.product_id)}
+                            disabled={!canWrite}
+                            title={!canWrite ? "You don't have write permission" : undefined}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -1119,6 +1136,43 @@ export default function MaterialDetailsPage() {
         isLoading={createAccessoriesMutation.isPending || updateAccessoriesMutation.isPending}
       />
 
+      {/* TRIMS & ACCESSORIES COMBINED DIALOG */}
+      <TrimsAccessoriesDialog
+        open={trimsAccessoriesDialogOpen}
+        onOpenChange={setTrimsAccessoriesDialogOpen}
+        editingItem={editingTrimsAccessories}
+        itemType={trimsAccessoriesType}
+        existingTrimsItems={trimsData || []}
+        existingAccessoriesItems={accessoriesData || []}
+        onSubmit={(data) => {
+          const consumableValue = data.consumable_flag || "none";
+          const transformedData = {
+            ...data,
+            consumable_flag: consumableValue === "yes" ? true : false,
+          };
+          if (trimsAccessoriesType === "trims") {
+            if (editingTrimsAccessories) {
+              updateTrimsMutation.mutate({ id: editingTrimsAccessories.product_id, data: transformedData });
+            } else {
+              const cachedData = queryClient.getQueryData<any[]>(["merchandiser", "trims"]) || trimsData || [];
+              const finalId = generateProductId(data.product_name, data.category || "", cachedData);
+              createTrimsMutation.mutate({ ...transformedData, product_id: finalId });
+            }
+          } else {
+            if (editingTrimsAccessories) {
+              updateAccessoriesMutation.mutate({ id: editingTrimsAccessories.product_id, data: transformedData });
+            } else {
+              const cachedData = queryClient.getQueryData<any[]>(["merchandiser", "accessories"]) || accessoriesData || [];
+              const finalId = generateProductId(data.product_name, data.category || "", cachedData);
+              createAccessoriesMutation.mutate({ ...transformedData, product_id: finalId });
+            }
+          }
+          setTrimsAccessoriesDialogOpen(false);
+          setEditingTrimsAccessories(null);
+        }}
+        isLoading={createTrimsMutation.isPending || updateTrimsMutation.isPending || createAccessoriesMutation.isPending || updateAccessoriesMutation.isPending}
+      />
+
       {/* FINISHED GOOD DIALOG */}
       <FinishedGoodDialog
         open={finishedGoodDialogOpen}
@@ -1214,6 +1268,7 @@ function YarnDialog({
     yarn_id: "",
     yarn_name: "",
     yarn_composition: "",
+    yarn_composition_details: null as YarnCompositionData | null,
     blend_ratio: "",
     yarn_count: "",
     count_system: "",
@@ -1224,6 +1279,9 @@ function YarnDialog({
     remarks: "",
   });
 
+  // State for composition editor popup
+  const [compositionEditorOpen, setCompositionEditorOpen] = useState(false);
+
   // Update form when editing
   useEffect(() => {
     if (editingYarn) {
@@ -1231,6 +1289,7 @@ function YarnDialog({
         yarn_id: editingYarn.yarn_id || "",
         yarn_name: editingYarn.yarn_name || "",
         yarn_composition: editingYarn.yarn_composition || "",
+        yarn_composition_details: editingYarn.yarn_composition_details || null,
         blend_ratio: editingYarn.blend_ratio || "",
         yarn_count: editingYarn.yarn_count || "",
         count_system: editingYarn.count_system || "",
@@ -1245,6 +1304,7 @@ function YarnDialog({
         yarn_id: "",
         yarn_name: "",
         yarn_composition: "",
+        yarn_composition_details: null,
         blend_ratio: "",
         yarn_count: "",
         count_system: "",
@@ -1256,6 +1316,19 @@ function YarnDialog({
       });
     }
   }, [editingYarn, open]);
+
+  // Handle composition data save from the editor
+  const handleCompositionSave = (data: YarnCompositionData) => {
+    const displayText = formatCompositionDisplay(data);
+    setFormData({
+      ...formData,
+      yarn_composition: displayText,
+      yarn_composition_details: data,
+      // Also update yarn_count and count_system from composition data
+      yarn_count: data.fiberCount && data.ply ? `${data.fiberCount}/${data.ply}` : formData.yarn_count,
+      count_system: data.countSystem || formData.count_system,
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1297,16 +1370,34 @@ function YarnDialog({
                 placeholder="e.g., Cotton Combed 30s"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="yarn_composition">Yarn Composition</Label>
+            <div className="space-y-2 col-span-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="yarn_composition">Yarn Composition</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCompositionEditorOpen(true)}
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  {formData.yarn_composition_details ? "Edit Composition" : "Add Composition"}
+                </Button>
+              </div>
               <Input
                 id="yarn_composition"
                 value={formData.yarn_composition}
                 onChange={(e) =>
                   setFormData({ ...formData, yarn_composition: e.target.value })
                 }
-                placeholder="e.g., 100% Cotton"
+                placeholder="e.g., 50% BCI COTTON / 38% RECYCLED / 12% ELASTANE | 50/2 Nm | 86g"
+                className="bg-muted/50"
+                readOnly={!!formData.yarn_composition_details}
               />
+              {formData.yarn_composition_details && (
+                <p className="text-xs text-muted-foreground">
+                  Click "Edit Composition" to modify the detailed breakdown
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="blend_ratio">Blend Ratio</Label>
@@ -1416,6 +1507,14 @@ function YarnDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Yarn Composition Editor Popup */}
+      <YarnCompositionEditor
+        open={compositionEditorOpen}
+        onOpenChange={setCompositionEditorOpen}
+        initialData={formData.yarn_composition_details || undefined}
+        onSave={handleCompositionSave}
+      />
     </Dialog>
   );
 }
@@ -1444,6 +1543,7 @@ function FabricDialog({
     gsm: "",
     gauge_epi: "",
     width: "",
+    cuttable_width: "",
     stretch: "",
     shrink: "",
     finish: "",
@@ -1465,6 +1565,7 @@ function FabricDialog({
         gsm: editingFabric.gsm || "",
         gauge_epi: editingFabric.gauge_epi || "",
         width: editingFabric.width || "",
+        cuttable_width: editingFabric.cuttable_width || "",
         stretch: editingFabric.stretch || "",
         shrink: editingFabric.shrink || "",
         finish: editingFabric.finish || "",
@@ -1484,6 +1585,7 @@ function FabricDialog({
         gsm: "",
         gauge_epi: "",
         width: "",
+        cuttable_width: "",
         stretch: "",
         shrink: "",
         finish: "",
@@ -1587,6 +1689,15 @@ function FabricDialog({
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="cuttable_width">Cuttable Width</Label>
+              <Input
+                id="cuttable_width"
+                value={formData.cuttable_width}
+                onChange={(e) => setFormData({ ...formData, cuttable_width: e.target.value })}
+                placeholder="e.g., 68 inches (usable width)"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="composition">Composition</Label>
               <Input
                 id="composition"
@@ -1603,15 +1714,13 @@ function FabricDialog({
                 <UnitSelector
                   value={formData.unit_id}
                   onChange={(value) => setFormData({ ...formData, unit_id: value })}
-                  categoryFilter="Weight"
                   placeholder="Select unit"
                   className="flex-1"
                 />
-                {formData.unit_id > 0 && formData.gsm && (
+                {formData.unit_id > 0 && (
                   <InlineConverter
-                    value={parseFloat(formData.gsm) || 0}
+                    value={formData.gsm ? parseFloat(formData.gsm) : 1}
                     fromUnitId={formData.unit_id}
-                    categoryName="Weight"
                   />
                 )}
               </div>
@@ -2073,6 +2182,249 @@ function AccessoriesDialog({
                 </>
               ) : (
                 <>{editingAccessories ? "Update" : "Create"} Accessories</>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ========== TRIMS & ACCESSORIES COMBINED DIALOG ==========
+function TrimsAccessoriesDialog({
+  open,
+  onOpenChange,
+  editingItem,
+  itemType,
+  existingTrimsItems = [],
+  existingAccessoriesItems = [],
+  onSubmit,
+  isLoading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingItem: any;
+  itemType: "trims" | "accessories";
+  existingTrimsItems?: any[];
+  existingAccessoriesItems?: any[];
+  onSubmit: (data: any) => void;
+  isLoading: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    product_id: "",
+    product_name: "",
+    category: "",
+    sub_category: "",
+    unit_id: 0,
+    consumable_flag: "none" as "yes" | "no" | "none",
+    remarks: "",
+  });
+
+  // Predefined options based on type
+  const trimsProductNames = [
+    "Metal Button", "Plastic Button", "Shell Button", "Wooden Button",
+    "Zipper", "Invisible Zipper", "Metal Zipper", "Plastic Zipper",
+    "Thread", "Polyester Thread", "Cotton Thread", "Nylon Thread",
+    "Elastic", "Waistband Elastic", "Leg Elastic", "Arm Elastic",
+    "Velcro", "Hook and Loop", "Snap Button", "Rivet",
+    "Eyelet", "Grommet", "D-Ring", "Buckle"
+  ];
+
+  const trimsCategories = [
+    "Button", "Zipper", "Thread", "Elastic", "Fastener",
+    "Hardware", "Closure", "Reinforcement", "Decorative"
+  ];
+
+  const trimsSubCategories = [
+    "2-hole", "4-hole", "Shank", "Snap", "Toggle",
+    "Coil", "Invisible", "Metal Teeth", "Plastic Teeth",
+    "Core Spun", "Textured", "Monofilament", "Multifilament",
+    "Knitted", "Woven", "Braided", "Flat"
+  ];
+
+  const accessoriesProductNames = [
+    "Woven Label", "Printed Label", "Care Label", "Size Label",
+    "Hang Tag", "Price Tag", "Swing Tag", "Barcode Tag",
+    "Plastic Hanger", "Wire Hanger", "Wooden Hanger", "Clip Hanger",
+    "Sticker", "Hologram Sticker", "Security Sticker", "Brand Sticker",
+    "Poly Bag", "Paper Bag", "Gift Box", "Tissue Paper"
+  ];
+
+  const accessoriesCategories = [
+    "Label", "Tag", "Hanger", "Sticker", "Packaging",
+    "Branding", "Security", "Information", "Decoration"
+  ];
+
+  const accessoriesSubCategories = [
+    "Main Label", "Care Label", "Size Label", "Brand Label",
+    "Hang Tag", "Price Tag", "Swing Tag", "Security Tag",
+    "Plastic", "Wire", "Wood", "Clip", "Padded",
+    "Hologram", "Barcode", "QR Code", "RFID"
+  ];
+
+  const productNames = itemType === "trims" ? trimsProductNames : accessoriesProductNames;
+  const categories = itemType === "trims" ? trimsCategories : accessoriesCategories;
+  const subCategories = itemType === "trims" ? trimsSubCategories : accessoriesSubCategories;
+  const existingItems = itemType === "trims" ? existingTrimsItems : existingAccessoriesItems;
+
+  // Auto-generate Product ID from product name (only for new items)
+  React.useEffect(() => {
+    if (!editingItem && formData.product_name) {
+      const generatedId = generateProductId(formData.product_name, formData.category || "", existingItems);
+      setFormData((prev) => ({ ...prev, product_id: generatedId }));
+    }
+  }, [formData.product_name, formData.category, editingItem, existingItems]);
+
+  React.useEffect(() => {
+    if (editingItem) {
+      let consumableValue: "yes" | "no" | "none" = "none";
+      if (editingItem.consumable_flag === true || editingItem.consumable_flag === "yes") {
+        consumableValue = "yes";
+      } else if (editingItem.consumable_flag === false || editingItem.consumable_flag === "no") {
+        consumableValue = "no";
+      }
+      setFormData({
+        product_id: editingItem.product_id || "",
+        product_name: editingItem.product_name || "",
+        category: editingItem.category || "",
+        sub_category: editingItem.sub_category || "",
+        unit_id: editingItem.unit_id || 0,
+        consumable_flag: consumableValue,
+        remarks: editingItem.remarks || "",
+      });
+    } else {
+      setFormData({
+        product_id: "",
+        product_name: "",
+        category: "",
+        sub_category: "",
+        unit_id: 0,
+        consumable_flag: "none",
+        remarks: "",
+      });
+    }
+  }, [editingItem, open, itemType]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.unit_id || formData.unit_id === 0) {
+      toast.error("Please select a unit");
+      return;
+    }
+    onSubmit(formData);
+  };
+
+  const typeLabel = itemType === "trims" ? "Trims" : "Accessories";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {editingItem ? `Edit ${typeLabel}` : `Add New ${typeLabel}`}
+          </DialogTitle>
+          <DialogDescription>
+            {editingItem
+              ? `Update the ${typeLabel.toLowerCase()} details below`
+              : `Fill in the details to create a new ${typeLabel.toLowerCase()} record`}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="product_id">Product ID (Auto-generated)</Label>
+              <Input
+                id="product_id"
+                value={formData.product_id}
+                onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+                placeholder="Will be auto-generated"
+                disabled
+              />
+            </div>
+            <SearchableDropdown
+              label="Product Name"
+              value={formData.product_name}
+              onChange={(value) => setFormData({ ...formData, product_name: value })}
+              options={productNames}
+              placeholder="Select or type product name..."
+              required
+            />
+            <SearchableDropdown
+              label="Category"
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value })}
+              options={categories}
+              placeholder="Select or type category..."
+            />
+            <SearchableDropdown
+              label="Sub-Category"
+              value={formData.sub_category}
+              onChange={(value) => setFormData({ ...formData, sub_category: value })}
+              options={subCategories}
+              placeholder="Select or type sub-category..."
+            />
+            <div className="space-y-2">
+              <Label htmlFor="unit_id">
+                Unit <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex items-center gap-2">
+                <UnitSelector
+                  value={formData.unit_id}
+                  onChange={(value) => setFormData({ ...formData, unit_id: value })}
+                  placeholder="Select unit"
+                  className="flex-1"
+                />
+                {formData.unit_id > 0 && (
+                  <InlineConverter
+                    value={1}
+                    fromUnitId={formData.unit_id}
+                    categoryName="Quantity"
+                  />
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="consumable_flag">Consumable</Label>
+              <Select
+                value={formData.consumable_flag || "none"}
+                onValueChange={(value: "yes" | "no" | "none") =>
+                  setFormData({ ...formData, consumable_flag: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="remarks">Remarks</Label>
+            <Textarea
+              id="remarks"
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              placeholder="Additional notes or remarks"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {editingItem ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                <>{editingItem ? "Update" : "Create"} {typeLabel}</>
               )}
             </Button>
           </DialogFooter>

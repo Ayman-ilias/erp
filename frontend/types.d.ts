@@ -47,6 +47,15 @@ type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 // ============================================================================
 
 /** User entity */
+/** Page permission structure */
+interface PagePermissionAccess {
+  read: boolean;
+  write: boolean;
+}
+
+/** Page permissions by department */
+type PagePermissions = Record<string, Record<string, PagePermissionAccess>>;
+
 interface User extends BaseEntity {
   username: string;
   email: string;
@@ -57,6 +66,7 @@ interface User extends BaseEntity {
   is_active: boolean;
   is_superuser: boolean;
   department_access?: string[];
+  page_permissions?: PagePermissions;  // Page-level permissions with read/write
   last_login?: string;
   avatar_url?: string;
 }
@@ -73,11 +83,13 @@ interface UserCreate {
   is_active?: boolean;
   is_superuser?: boolean;
   department_access?: string[];
+  page_permissions?: PagePermissions;
 }
 
 /** User update payload */
 interface UserUpdate extends Partial<Omit<UserCreate, "password">> {
   password?: string;
+  page_permissions?: PagePermissions;
 }
 
 /** Login credentials */
